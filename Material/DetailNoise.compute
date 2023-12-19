@@ -1,0 +1,184 @@
+﻿#pragma kernel main3D
+
+
+RWTexture3D<float4> outDetailTex3D;
+StructuredBuffer<int3> inSamplerPoint0;
+StructuredBuffer<int3> inSamplerPoint1;
+StructuredBuffer<int3> inSamplerPoint2;
+
+int inGridLength;
+int inGridCount;
+int inResolution;
+float inGridRate;
+float3 inOffset;
+bool inFlip;
+float inFrequency;
+
+#define FloatMax 3.402823466e+38f
+
+
+//-----------------------------------------------------
+//
+//	3D
+//
+int3 getGridF(in float3 pos, in float rate)
+{
+	return int3(pos.x / rate, pos.y / rate, pos.z / rate);
+}
+
+void getNeighbour27(in StructuredBuffer<int3> samplerPoint, in int gridCount, in int3 gridPos, out int3 result[27])
+{
+	int index = 0;
+	int offset_z = gridCount * gridCount;
+	float3 offset = 0;
+
+	for (int z = -1; z <= 1; z++)
+	{
+		for (int y = -1; y <= 1; y++)
+		{
+			for (int x = -1; x <= 1; x++)
+			{
+				int pos_z = gridPos.z + z;
+				int pos_y = gridPos.y + y;
+				int pos_x = gridPos.x + x;
+				offset.x = 0;
+				offset.y = 0;
+				offset.z = 0;
+
+				if (pos_x < 0)
+				{
+					pos_x = gridCount - 1;
+					offset.x = -inResolution;
+				}
+
+				if (pos_x >= gridCount)
+				{
+					pos_x = 0;
+					offset.x = inResolution;
+				}
+
+				if (pos_y < 0)
+				{
+					pos_y = gridCount - 1;
+					offset.y = -inResolution;
+				}
+
+				if (pos_y >= gridCount)
+				{
+					pos_y = 0;
+					offset.y = inResolution;
+				}
+
+				if (pos_z < 0)
+				{
+					pos_z = gridCount - 1;
+					offset.z = -inResolution;
+				}
+
+				if (pos_z >= gridCount)
+				{
+					pos_z = 0;
+					offset.z = inResolution;
+				}
+
+				result[index] = samplerPoint[pos_x + pos_y * gridCount + pos_z * offset_z] + offset;
+				index++;
+			}
+		}
+	}
+}
+
+float getCloseDistance(in int3 n27[27], in int3 pos)
+{
+	float result = FloatMax;
+
+	for (int i = 0; i < 27; i++)
+	{
+		float dis = distance(n27[i], pos);
+		if (dis < result)
+		{
+			result = dis;
+		}
+	}
+
+	return result;
+}
+
+float getNoiseF(in StructuredBuffer<int3> samplerPoint, in int gridCount, in int gridLength, in float rate, float3 pos)
+{
+	pos.x = pos.x - (int)pos.x;
+	pos.y = pos.y - (int)pos.y;
+	pos.z = pos.z - (int)pos.z;
+
+	if (pos.x < 0.0f)
+	{
+		pos.x = 1.0f + pos.x;
+	}
+
+	if (pos.y < 0.0f)
+	{
+		pos.y = 1.0f + pos.y;
+	}
+
+	if (pos.z < 0.0f)
+	{
+		pos.z = 1.0f + pos.z;
+	}
+
+
+	int3 grid_pos = getGridF(pos, rate);
+	int3 n27[27];
+	getNeighbour27(samplerPoint, gridCount, grid_pos, n27);
+
+	int3 cp = int3(pos.x * inResolution, pos.y * inResolution, pos.z * inResolution);
+
+	if (inFlip)
+	{
+		return 1.0f - getCloseDistance(n27, cp) / gridLength;
+	}
+
+	return getCloseDistance(n27, cp) / gridLength;
+}
+
+float calculateWorleyNoise(in StructuredBuffer<int3> samplerPoint, in int gridCount, in int gridLength, in float rate, float3 pos, float freq)
+{
+	float strength = 1.0f;
+	float sum_strength = 1.0f;
+	float noise = 0;
+	for (int o = 0; o < 2; o++)
+	{
+		noise += getNoiseF(samplerPoint, gridCount, gridLength, rate, pos * freq + inOffset) * strength;
+		freq *= 2.0f;
+		strength *= 0.5f;
+		sum_strength += strength;
+	}
+
+	noise /= sum_strength;
+
+	return noise;
+}
+
+
+[numthreads(8, 8, 2)]
+void main3D(uint3 id : SV_DispatchThreadID)
+{
+	float3 pos = float3(id.x / (float)inResolution - 0.5f
+		, id.y / (float)inResolution - 0.5f
+		, id.z / (float)inResolution - 0.5f);
+
+	const int grid_count0 = 4;
+	const int grid_count1 = 8;
+	const int grid_count2 = 16;
+
+	float worley00 = calculateWorleyNoise(
+		inSamplerPoint0, grid_count0, inResolution / grid_count0, 1.0 / grid_count0
+		, pos, 1);
+	float worley01 = calculateWorleyNoise(
+		inSamplerPoint1, grid_count1, inResolution / grid_count1, 1.0 / grid_count1
+		, pos, 1);
+	float worley02 = calculateWorleyNoise(
+		inSamplerPoint2, grid_count2, inResolution / grid_count2, 1.0 / grid_count2
+		, pos, 1);
+
+	outDetailTex3D[id] = float4(worley00, worley01, worley02, 0);
+}
