@@ -1,4 +1,4 @@
-﻿Shader "Hidden/BilateralBlur"
+﻿Shader "Tezcat/BilateralBlur"
 {
 	Properties
 	{

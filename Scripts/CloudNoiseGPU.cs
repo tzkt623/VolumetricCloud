@@ -196,6 +196,11 @@ namespace tezcat.Framework.Exp
 
         protected override void updateData()
         {
+            foreach (var item in mRenderers)
+            {
+                item.material.SetInt("_Channel", (int)mChannel);
+            }
+
             this.updateColor();
         }
 

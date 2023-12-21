@@ -1,4 +1,4 @@
-﻿Shader "Tezcat/WorleyNoise"
+﻿Shader "Tezcat/WorleyNoiseView"
 {
 	Properties
 	{

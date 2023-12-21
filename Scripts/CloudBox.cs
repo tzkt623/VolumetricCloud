@@ -15,7 +15,8 @@ namespace tezcat.Framework.Exp
         public DetailNoise mDetailNoise;
         public Shader mShader;
         public Texture2D mWeatherTexture2D;
-        public int mStepCount = 50;
+        [Min(1)]
+        public float mStepThickness = 50;
         public float mShapeDensityStrength = 1.0f;
         public float mDetailDensityStrength = 1.0f;
         [Range(0.0f, 1.0f)]
@@ -113,7 +114,7 @@ namespace tezcat.Framework.Exp
             mMaterial.SetTexture("_DetailTex3D", mDetailTexture);
             mMaterial.SetTexture("_WeatherTex2D", mWeatherTexture2D);
 
-            mMaterial.SetFloat("_StepCount", mStepCount);
+            mMaterial.SetFloat("_StepThickness", mStepThickness);
 
             mMaterial.SetFloat("_CloudScale", mCloudScale);
             mMaterial.SetVector("_CloudOffset", mCloudOffset);
@@ -161,7 +162,7 @@ namespace tezcat.Framework.Exp
         private void OnDestroy()
         {
             mWorleyNoise.onTextureCreated -= this.onShapeTextureCreated;
-            mWorleyNoise.onTextureCreated -= this.onDetailTextureCreated;
+            mDetailNoise.onTextureCreated -= this.onDetailTextureCreated;
 
             mBlurRenderTexture?.Release();
             mShapeTexture?.Release();

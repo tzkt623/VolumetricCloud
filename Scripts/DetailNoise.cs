@@ -23,7 +23,6 @@ namespace tezcat.Framework.Exp
         public RenderTexture renderTexture => mDetailRenderTexture;
 
         private Vector3Int[][] mMarkPointArray3D32;
-        private ComputeBuffer mDetailMarkPointBuffer;
         private ComputeBuffer[] mBuffers;
         private RenderTexture mDetailRenderTexture;
         private int mCSKernel;
@@ -110,7 +109,7 @@ namespace tezcat.Framework.Exp
 
             for (int i = 0; i < 3; i++)
             {
-                int count = (int)Mathf.Pow(2, i + 2);
+                int count = (int)Mathf.Pow(2, i + 1);
                 this.initSamplePoint(i, count);
                 mBuffers[i] = this.createBuffer(mCSKernel, $"inSamplerPoint{i}", count, mMarkPointArray3D32[i]);
             }

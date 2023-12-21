@@ -1,4 +1,4 @@
-﻿Shader "Unlit/PerlinNoise3D"
+﻿Shader "Tezcat/PerlinNoiseView"
 {
     Properties
     {
