@@ -39,8 +39,11 @@ namespace tezcat.Framework.Exp
         [Header("Cloud Info")]
         public Light mLight;
         public Transform mBox;
+        [Min(0.1f)]
+        public float mStepSize = 10;
         public bool mDrawLight = false;
         public bool mDrawDetecteRay = false;
+        public bool mDrawCameraRay = false;
 
 
         // Start is called before the first frame update
@@ -164,44 +167,44 @@ namespace tezcat.Framework.Exp
                 {
                     for (int sw = 0; sw <= screen_width; sw++)
                     {
-                        var xp = Vector3.Lerp(lb, rb, sw / (float)screen_width);
-                        xp += lengthH * sh / screen_height;
+                        var camera_ray_end_pos = Vector3.Lerp(lb, rb, sw / (float)screen_width);
+                        camera_ray_end_pos += lengthH * sh / screen_height;
 
-                        if (!mDrawDetecteRay)
+                        if (mDrawCameraRay)
                         {
-                            Gizmos.DrawLine(camera_pos, xp);
-                            continue;
+                            Gizmos.DrawLine(camera_pos, camera_ray_end_pos);
                         }
 
-                        var box_info = rayBoxDst(box_min, box_max, camera_pos, xp);
-                        float dst_to_box = box_info.x;
-                        float dst_inside_box = box_info.y;
-
-                        if (dst_inside_box > 0)
+                        if (mDrawDetecteRay)
                         {
-                            Gizmos.color = Color.cyan;
+                            var ray_dir = Vector3.Normalize(camera_ray_end_pos - camera_pos);
+                            var box_info = rayBoxDst(box_min, box_max, camera_pos, ray_dir);
+                            float dst_to_box = box_info.x;
+                            float dst_inside_box = box_info.y;
 
-                            Gizmos.DrawLine(camera_pos, camera_pos + xp * dst_to_box);
-                            int step = 10;
-                            float step_size = dst_inside_box / step;
-                            for (int i = 0; i <= step; i++)
+                            if (dst_inside_box > 0)
                             {
-                                Vector3 p = camera_pos + xp * (dst_to_box + step_size * i);
-                                Gizmos.DrawWireSphere(p, 0.02f);
+                                Gizmos.color = Color.cyan;
 
-                                if (mDrawLight)
+                                Gizmos.DrawLine(camera_pos, camera_pos + ray_dir * dst_to_box);
+                                float step_size = mStepSize;
+                                float total_size = 0;
+
+                                while (total_size < dst_inside_box)
                                 {
-                                    this.lightRayMatch(p, box_min, box_max);
+                                    Vector3 p = camera_pos + ray_dir * (dst_to_box + total_size);
+                                    total_size += step_size;
+                                    Gizmos.DrawWireSphere(p, 0.02f);
+
+                                    if (mDrawLight)
+                                    {
+                                        this.lightRayMatch(p, step_size, box_min, box_max);
+                                    }
                                 }
+
+                                Gizmos.color = Color.white;
                             }
-
-                            Gizmos.color = Color.white;
                         }
-                        else
-                        {
-                            Gizmos.DrawLine(camera_pos, xp);
-                        }
-
                     }
                 }
             }
@@ -232,18 +235,18 @@ namespace tezcat.Framework.Exp
             Gizmos.DrawWireSphere(far_up_sp, 0.02f);
         }
 
-        private void lightRayMatch(Vector3 pos, Vector3 boxMin, Vector3 boxMax)
+        private void lightRayMatch(Vector3 pos, float stepSize, Vector3 boxMin, Vector3 boxMax)
         {
             Gizmos.color = Color.yellow;
             var light_dir = -mLight.transform.forward;
-            Gizmos.DrawLine(pos, pos + light_dir * 3);
 
             var box_info = rayBoxDst(boxMin, boxMax, pos, light_dir);
             float dst_to_box = box_info.x;
             float dst_inside_box = box_info.y;
+            Gizmos.DrawLine(pos, pos + light_dir * dst_inside_box);
 
-            int step = 10;
-            float step_size = dst_inside_box / step;
+            int step = (int)(dst_inside_box / stepSize);
+            float step_size = stepSize;
 
             for (int i = 1; i < step; i++)
             {

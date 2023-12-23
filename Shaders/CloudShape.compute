@@ -71,7 +71,7 @@ float calculateWorleyNoise(in StructuredBuffer<int3> samplePoints
 	int grid_length = inResolution / gridCount;
 
 	float strength = 1.0f;
-	float sum_strength = 1.0f;
+	float sum_strength = 0;
 	float noise = 0;
 
 	for (int o = 0; o < octave; o++)
@@ -80,9 +80,9 @@ float calculateWorleyNoise(in StructuredBuffer<int3> samplePoints
 			, pos * freq + inOffset
 			, gridCount, grid_length, grid_rate) * strength;
 
+		sum_strength += strength;
 		freq *= 2.0f;
 		strength *= 0.3f;
-		sum_strength += strength;
 	}
 
 	noise /= sum_strength;
@@ -92,21 +92,22 @@ float calculateWorleyNoise(in StructuredBuffer<int3> samplePoints
 
 float calculatePerlinNoise(float3 pos)
 {
-	float freq = inFrequency;
+	float freq = floor(inFrequency);
 	float strength = 1.0f;
-	float sum_strength = strength;
-	float perlin = 0;
+	float sum_strength = 0;
+	float noise = 0;
 	for (int o = 0; o < inOctave; o++)
 	{
-		perlin += snoise(pos * freq + inOffset) * strength;
+		noise += pnoise(pos * freq + inOffset, freq) * strength;
+		sum_strength += strength;
+
 		freq *= inLacunarity;
 		strength *= inPersistence;
-		sum_strength += strength;
 	}
 
-	perlin /= sum_strength;
+	noise /= sum_strength;
 
-	return (perlin + 1.0) * 0.5f;
+	return (noise + 1.0) * 0.5f;
 }
 
 [numthreads(8, 8, 2)]
@@ -142,7 +143,7 @@ void main3D(uint3 id : SV_DispatchThreadID)
 	}
 
 	float perlin = calculatePerlinNoise(pos);
-	float perlin_worley = remapP(perlin, worley00, 1.0f, 0.0, 1.0f);
+	float perlin_worley = remapPositive(perlin, worley00, 1.0f, 0.0, 1.0f);
 
 	outShapeTex3D[id] = float4(perlin_worley, worley01, worley02, worley03);
 	outShapePerlinNoiseTex3D[id] = perlin;

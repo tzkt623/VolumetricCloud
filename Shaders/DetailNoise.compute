@@ -24,18 +24,9 @@ float calculateWorleyNoise(in StructuredBuffer<int3> samplerPoint, in int gridCo
 	float noise = 0;
 	for (int o = 0; o < 2; o++)
 	{
-		if (inFlip)
-		{
-			noise += 1.0f - getNoiseF(samplerPoint, inResolution
-				, pos * freq + inOffset, gridCount, gridLength, rate) * strength;
-		}
-		else
-		{
-			noise += getNoiseF(samplerPoint, inResolution
-				, pos * freq + inOffset, gridCount, gridLength, rate) * strength;
-		}
+		noise += getNoiseF(samplerPoint, inResolution, pos * freq + inOffset, gridCount, gridLength, rate) * strength;
 		freq *= 2.0f;
-		strength *= 0.5f;
+		strength *= 0.3f;
 		sum_strength += strength;
 	}
 
@@ -48,9 +39,9 @@ float calculateWorleyNoise(in StructuredBuffer<int3> samplerPoint, in int gridCo
 [numthreads(8, 8, 2)]
 void main3D(uint3 id : SV_DispatchThreadID)
 {
-	float3 pos = float3(id.x / (float)inResolution - 0.5f
-		, id.y / (float)inResolution - 0.5f
-		, id.z / (float)inResolution - 0.5f);
+	float3 pos = float3(id.x / (float)inResolution
+		, id.y / (float)inResolution
+		, id.z / (float)inResolution);
 
 	const int grid_count0 = 2;
 	const int grid_count1 = 4;
@@ -65,6 +56,13 @@ void main3D(uint3 id : SV_DispatchThreadID)
 	float worley02 = calculateWorleyNoise(
 		inSamplerPoint2, grid_count2, inResolution / grid_count2, 1.0 / grid_count2
 		, pos, 1);
+
+	if (inFlip)
+	{
+		worley00 = 1 - worley00;
+		worley01 = 1 - worley01;
+		worley02 = 1 - worley02;
+	}
 
 	outDetailTex3D[id] = float4(worley00, worley01, worley02, 0);
 }

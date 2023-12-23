@@ -130,6 +130,7 @@ namespace tezcat.Framework.Exp
                             wrapMode = TextureWrapMode.Repeat,
                             filterMode = FilterMode.Bilinear,
                             enableRandomWrite = true,
+                            autoGenerateMips = true
                         };
                         mShapeRenderTexture.Create();
                         mComputeShader.SetTexture(mCSKernel, "outShapeTex3D", mShapeRenderTexture);

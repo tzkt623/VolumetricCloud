@@ -247,7 +247,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 526822131}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.0000022053719, z: 0.30000308}
+  m_LocalPosition: {x: 0, y: 0, z: 0.3000002}
   m_LocalScale: {x: 0.2, y: 0.2, z: 0.2}
   m_Children: []
   m_Father: {fileID: 1182117742}
@@ -986,14 +986,14 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1182117739}
-  m_LocalRotation: {x: -0.258819, y: 0, z: 0, w: 0.9659259}
-  m_LocalPosition: {x: 0, y: -21, z: -83.1}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.21751681, y: 224.26, z: -9.39}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 526822132}
   m_Father: {fileID: 0}
   m_RootOrder: 0
-  m_LocalEulerAnglesHint: {x: -30, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1182117743
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1008,11 +1008,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   mCamera: {fileID: 1182117741}
   mDrawAllRay: 0
-  mCurrentWorldPosition: {x: 0, y: -0.0000022053719, z: 0.30000308}
-  mViewSpacePosition: {x: 0, y: -0.0000003911648, z: 0.30000326}
-  mClipSpacePosition: {x: 0, y: -0.0000006775173, z: -0.29999673}
-  mClipSize: 0.30000326
-  mNDCSpacePosition: {x: 0, y: -0.0000022583663, z: -0.99997824}
+  mCurrentWorldPosition: {x: 0, y: 0, z: 0.3000002}
+  mViewSpacePosition: {x: 0, y: 0, z: 0.3000002}
+  mClipSpacePosition: {x: 0, y: 0, z: -0.2999998}
+  mClipSize: 0.3000002
+  mNDCSpacePosition: {x: 0, y: 0, z: -0.9999987}
   mSampleObject: {fileID: 526822132}
   mClipObject: {fileID: 1884364918}
   mNDCObject: {fileID: 1953792050}
@@ -1028,8 +1028,10 @@ MonoBehaviour:
   mViewPos: {x: 0, y: 0, z: -1, w: 1.6671666}
   mLight: {fileID: 1991451969}
   mBox: {fileID: 1361336275}
-  mDrawLight: 0
-  mDrawDetecteRay: 0
+  mStepSize: 1.26
+  mDrawLight: 1
+  mDrawDetecteRay: 1
+  mDrawCameraRay: 0
 --- !u!114 &1182117744
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1146,7 +1148,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1310456541}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.0000003911648, z: 0.30000326}
+  m_LocalPosition: {x: 0, y: 0, z: 0.3000002}
   m_LocalScale: {x: 0.2, y: 0.2, z: 0.2}
   m_Children: []
   m_Father: {fileID: 608461992}
@@ -1232,25 +1234,27 @@ MonoBehaviour:
   mDetailNoise: {fileID: 1975134052}
   mShader: {fileID: 4800000, guid: d8b610382de4a02489774d831873d14f, type: 3}
   mWeatherTexture2D: {fileID: 2800000, guid: ef7a2acc27d031e4ba6390e8565f4b85, type: 3}
-  mStepThickness: 10
+  mStepThickness: 1
   mShapeDensityStrength: 1
-  mDetailDensityStrength: 1
-  mDensityThreshold: 0.55
-  mCloudScale: 0.5
+  mDensityThreshold: 0.38
+  mShapeScale: 0.1
+  mDetailDensityStrength: 0
+  mEdgeLength: 20
   mCloudColor: {r: 1, g: 1, b: 1, a: 1}
   mCloudColorLight: {r: 0.9438412, g: 0.990566, b: 0.990566, a: 1}
   mCloudColorBlack: {r: 0, g: 0, b: 0, a: 1}
   mCloudColorOffset: {x: 0.5, y: 0.04}
   mDarknessThreshold: 0
   mCloudAbsorption: 1
-  mLightAbsorption: 4.15
-  mEneryParams: {x: 0.5, y: -0.5, z: 0.49}
+  mLightAbsorption: 0.33
+  mEneryParams: {x: 0.5, y: 0.2, z: 0.51, w: 0}
+  mForwardScatteringScale: 1.58
   mCloudOffset: {x: 0, y: 0, z: 0}
   mCloudSpeed: {x: 0, y: 0, z: 0}
-  mShapeSpeedScale: {x: 0.2, y: 0, z: 0.2}
-  mDetailSpeedScale: {x: 1, y: 0, z: 1}
+  mShapeSpeedScale: {x: 0, y: 0, z: 0}
+  mDetailSpeedScale: {x: 0, y: 0, z: 0}
   mBlueNoise: {fileID: 2800000, guid: 74b510599ad2c73458d30bec8f14998b, type: 3}
-  mBlueNoiseIntensity: 20
+  mBlueNoiseIntensity: 0
   mEnableBilateralBlur: 0
   mBlurShader: {fileID: 4800000, guid: d049b6787b291e14fb15d50516b39c1f, type: 3}
   mBlurParams: {x: 9, y: 9, z: 2}
@@ -1262,8 +1266,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1361336271}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 229, z: 0}
-  m_LocalScale: {x: 1000, y: 317.08276, z: 1000}
+  m_LocalPosition: {x: 0, y: 600, z: 0}
+  m_LocalScale: {x: 1000, y: 496, z: 1000}
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 5
@@ -1401,7 +1405,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1884364917}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.0000006775173, z: -0.29999673}
+  m_LocalPosition: {x: 0, y: 0, z: -0.2999998}
   m_LocalScale: {x: 0.2, y: 0.2, z: 0.2}
   m_Children: []
   m_Father: {fileID: 1989173267}
@@ -1478,7 +1482,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1953792049}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.0000022583663, z: -0.99997824}
+  m_LocalPosition: {x: 0, y: 0, z: -0.9999987}
   m_LocalScale: {x: 0.2, y: 0.2, z: 0.2}
   m_Children: []
   m_Father: {fileID: 372104828}
@@ -1566,7 +1570,7 @@ MonoBehaviour:
   mGridCountArray: 04000000080000001000000020000000
   mFlipWorleyNoise: 1
   mOctave: 4
-  mFrequency: 4.2
+  mFrequency: 4
   mLacunarity: 4
   mPersistence: 0.5
   mOffset: {x: 0, y: 0, z: 0}

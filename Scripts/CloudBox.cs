@@ -18,11 +18,16 @@ namespace tezcat.Framework.Exp
         [Min(1)]
         public float mStepThickness = 50;
         public float mShapeDensityStrength = 1.0f;
-        public float mDetailDensityStrength = 1.0f;
         [Range(0.0f, 1.0f)]
         public float mDensityThreshold = 0.0f;
         [Min(0.0f)]
-        public float mCloudScale = 100.0f;
+        public float mShapeScale = 0.1f;
+        [Min(0.0f)]
+        public float mDetailDensityStrength = 1.0f;
+        [Min(0.0f)]
+        public float mEdgeLength = 1.0f;
+
+
 
         [Header("Lighting")]
         public Color mCloudColor;
@@ -35,7 +40,8 @@ namespace tezcat.Framework.Exp
         public float mCloudAbsorption = 1;
         [Min(0.0f)]
         public float mLightAbsorption = 0.5f;
-        public Vector3 mEneryParams;
+        public Vector4 mEneryParams;
+        public float mForwardScatteringScale;
 
         [Header("Motion")]
         public Vector3 mCloudOffset;
@@ -116,12 +122,14 @@ namespace tezcat.Framework.Exp
 
             mMaterial.SetFloat("_StepThickness", mStepThickness);
 
-            mMaterial.SetFloat("_CloudScale", mCloudScale);
+            mMaterial.SetFloat("_ShapeScale", mShapeScale);
+            mMaterial.SetFloat("_EdgeLength", mEdgeLength);
             mMaterial.SetVector("_CloudOffset", mCloudOffset);
             mMaterial.SetFloat("_CloudAbsorption", mCloudAbsorption);
             mMaterial.SetColor("_CloudColor", mCloudColor);
             mMaterial.SetColor("_CloudColorLight", mCloudColorLight);
             mMaterial.SetColor("_CloudColorBlack", mCloudColorBlack);
+            mMaterial.SetFloat("_ForwardScatteringScale", mForwardScatteringScale);
             mMaterial.SetVector("_CloudColorOffset", mCloudOffset);
             mMaterial.SetVector("_ShapeSpeedScale", mShapeSpeedScale);
             mMaterial.SetVector("_DetailSpeedScale", mDetailSpeedScale);
