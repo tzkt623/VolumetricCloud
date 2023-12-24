@@ -211,7 +211,7 @@
 
 				float4 shape = _ShapeTex3D.SampleLevel(sampler_ShapeTex3D, uvw + float3(time, sin(time), -time) * _ShapeSpeedScale, 0);
 				float low_freq_fbm = dot(shape.gba, float3(0.625f, 0.25f, 0.125f));
-				float base_shape = remap(low_freq_fbm, shape.r, 1.0, 0.0, 1.0);
+				float base_shape = remap(shape.r, -(1 - low_freq_fbm), 1.0, 0.0, 1.0);
 
 				return base_shape;
 			}
@@ -234,7 +234,7 @@
 
 				float3 uvw = (target * _ShapeScale * 0.01f + _CloudOffset * 0.01f);
 				float base_shape = calculateBaseShape(uvw);
-				float3 base_shape_with_cloud_types = base_shape *edge_x_rate* edge_z_rate;// *cloud_type;
+				float3 base_shape_with_cloud_types = base_shape * edge_x_rate * edge_z_rate;// *cloud_type;
 
 
 				float3 weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, uvw.xz, 0);
@@ -253,7 +253,7 @@
 					float high_freq_modifier = lerp(high_freq_fbm, 1.0 - high_freq_fbm, clamp(height * 10, 0.0, 1.0));
 					final = remap(final, clamp(high_freq_modifier * 0.5, 0.0, 1.0), 1.0, 0.0, 1.0);
 
-					final = max(0, final - _DensityThreshold) * _ShapeDensityStrength ;
+					final = max(0, final - _DensityThreshold) * _ShapeDensityStrength;
 					return final;
 				}
 

@@ -10,108 +10,24 @@ namespace tezcat.Framework.Exp
         public Camera mCamera;
         public bool mDrawAllRay = false;
 
-        [Header("Space Info")]
-        public Vector3 mCurrentWorldPosition;
-        public Vector3 mViewSpacePosition;
-        public Vector3 mClipSpacePosition;
-        public float mClipSize;
-        public Vector3 mNDCSpacePosition;
-
-        [Space]
-        public Transform mSampleObject;
-        public Transform mClipObject;
-        public Transform mNDCObject;
-        public Transform mViewObject;
-
-        [Space]
-        public Transform mClipSpace;
-        public Transform mNDCSpace;
-        public Transform mViewSpace;
-
-        [Header("NDC Map")]
-        public bool mUseScreenPos = false;
-        public bool mUseFreePos = false;
-        public bool mMultFar = false;
-        public Vector3 mScreenNDC;
-        public float mDepth;
-        public Vector4 mViewPos;
-
         [Header("Cloud Info")]
         public Light mLight;
         public Transform mBox;
         [Min(0.1f)]
         public float mStepSize = 10;
+        public float mDetectSphereRadius = 1;
         public bool mDrawLight = false;
-        public bool mDrawDetecteRay = false;
+        public bool mDrawDetectRay = false;
         public bool mDrawCameraRay = false;
 
-
-        // Start is called before the first frame update
         void Start()
         {
 
         }
 
-
         private void OnDrawGizmos()
         {
-            this.cameraInfo();
-            this.sapceViewer();
-            this.ndcFunc();
-        }
-
-        private void ndcFunc()
-        {
-            /*
-             * WolrdSpace * ViewMatrix => ViewSpace
-             * ViewSpace * ProjectionMatrix => ClipSpace
-             * ClipSpace / ClipSpace.w => NDCSpace
-             */
-
-            /*
-             * NDCSpace * ClipSpace.w => ClipSpace
-             * ClipSpace * InvProjectionMatrix => ViewSpace
-             * ViewSpace * InvViewMatrix => WorldSpace
-             */
-
-            if (mUseScreenPos)
-            {
-                Vector2 uv = new Vector2(Input.mousePosition.x / mCamera.pixelWidth, Input.mousePosition.y / mCamera.pixelHeight);
-                uv = uv * 2.0f - Vector2.one;
-                mScreenNDC = uv;
-            }
-
-            mScreenNDC = Vector3.Min(mScreenNDC, Vector3.one);
-            mScreenNDC = Vector3.Max(mScreenNDC, -Vector3.one);
-
-            if (mMultFar)
-            {
-                mDepth = Mathf.Min(mDepth, 1);
-                mDepth = Mathf.Max(mDepth, mCamera.nearClipPlane / mCamera.farClipPlane);
-            }
-            else
-            {
-                mDepth = Mathf.Min(mDepth, mCamera.farClipPlane);
-                mDepth = Mathf.Max(mDepth, mCamera.nearClipPlane);
-            }
-
-            Vector4 ndcPos = new Vector4(mScreenNDC.x, mScreenNDC.y, mScreenNDC.z, 0);
-            float far = mCamera.farClipPlane;
-            Vector4 clipPos = mMultFar ? new Vector4(ndcPos.x, ndcPos.y, ndcPos.z, 1) * far : new Vector4(ndcPos.x, ndcPos.y, ndcPos.z, 1);
-
-            var viewPos = mCamera.projectionMatrix.inverse * clipPos;
-            mViewPos = viewPos;
-            Vector4 viewPos3 = new Vector4(viewPos.x, viewPos.y, viewPos.z, 0.0f) * mDepth;
-
-            Vector3 viewPos3World = mCamera.cameraToWorldMatrix * viewPos3;
-            //Debug.Log(viewPos3World);
-            Gizmos.DrawLine(mCamera.transform.position, mCamera.transform.position + viewPos3World);
-            if (!mUseFreePos)
-            {
-                mSampleObject.position = mCamera.transform.position + viewPos3World;
-                mCurrentWorldPosition = mSampleObject.localPosition;
-            }
-
+            this.drawRay();
         }
 
         static Vector3 divide(Vector3 a, Vector3 b)
@@ -137,12 +53,12 @@ namespace tezcat.Framework.Exp
             return new Vector2(dstToBox, dstInBox);
         }
 
-        private void cameraInfo()
+        private void drawRay()
         {
             var resolution = Screen.currentResolution;
             var camera_pos = mCamera.transform.position;
             var plane_length = mCamera.nearClipPlane;
-            var rate_f_n = mCamera.farClipPlane / mCamera.nearClipPlane;
+            var rate_fDn = mCamera.farClipPlane / mCamera.nearClipPlane;
 
             var near_height = plane_length * Mathf.Tan(Mathf.Deg2Rad * mCamera.fieldOfView * 0.5f);
             var near_width = near_height * mCamera.aspect;
@@ -175,18 +91,20 @@ namespace tezcat.Framework.Exp
                             Gizmos.DrawLine(camera_pos, camera_ray_end_pos);
                         }
 
-                        if (mDrawDetecteRay)
+                        if (mDrawDetectRay)
                         {
                             var ray_dir = Vector3.Normalize(camera_ray_end_pos - camera_pos);
                             var box_info = rayBoxDst(box_min, box_max, camera_pos, ray_dir);
                             float dst_to_box = box_info.x;
                             float dst_inside_box = box_info.y;
 
-                            if (dst_inside_box > 0)
+                            float threshold = dst_inside_box / mStepSize;
+                            if (dst_inside_box > 0 && threshold <= 20)
                             {
                                 Gizmos.color = Color.cyan;
-
                                 Gizmos.DrawLine(camera_pos, camera_pos + ray_dir * dst_to_box);
+
+
                                 float step_size = mStepSize;
                                 float total_size = 0;
 
@@ -194,7 +112,8 @@ namespace tezcat.Framework.Exp
                                 {
                                     Vector3 p = camera_pos + ray_dir * (dst_to_box + total_size);
                                     total_size += step_size;
-                                    Gizmos.DrawWireSphere(p, 0.02f);
+                                    Gizmos.color = Color.cyan;
+                                    Gizmos.DrawWireSphere(p, mDetectSphereRadius);
 
                                     if (mDrawLight)
                                     {
@@ -226,8 +145,8 @@ namespace tezcat.Framework.Exp
             //draw far plane
             var far_sp = camera_pos + mCamera.transform.forward * mCamera.farClipPlane;
             Gizmos.DrawWireSphere(far_sp, 0.02f);
-            Gizmos.DrawLine(far_sp - right_offset * rate_f_n, far_sp + right_offset * rate_f_n);
-            Gizmos.DrawLine(far_sp - up_offset * rate_f_n, far_sp + up_offset * rate_f_n);
+            Gizmos.DrawLine(far_sp - right_offset * rate_fDn, far_sp + right_offset * rate_fDn);
+            Gizmos.DrawLine(far_sp - up_offset * rate_fDn, far_sp + up_offset * rate_fDn);
 
             var rate = mCamera.nearClipPlane / mCamera.farClipPlane;
             var dir = near_up_sp - camera_pos;
@@ -251,52 +170,9 @@ namespace tezcat.Framework.Exp
             for (int i = 1; i < step; i++)
             {
                 Vector3 p = pos + light_dir * (step_size * i);
-                Gizmos.DrawWireSphere(p, 0.02f);
+                Gizmos.DrawWireSphere(p, mDetectSphereRadius);
             }
             Gizmos.color = Color.white;
-        }
-
-        private void sapceViewer()
-        {
-            if (mUseFreePos)
-            {
-                mSampleObject.localPosition = mCurrentWorldPosition;
-            }
-
-            var wpos = mSampleObject.transform.position;
-
-            Vector4 sample_pos = new Vector4(wpos.x, wpos.y, wpos.z, 1);
-
-            mSampleObject.localScale = mSampleObject.localScale;
-            mViewObject.localScale = mSampleObject.localScale;
-            mClipObject.localScale = mSampleObject.localScale;
-            mNDCObject.localScale = mSampleObject.localScale;
-
-            //View
-            var view_pos = mCamera.worldToCameraMatrix * sample_pos;
-            var save_mat = Gizmos.matrix;
-            Gizmos.matrix = Matrix4x4.TRS(mViewSpace.transform.position, mViewSpace.transform.rotation, Vector3.one);
-            Gizmos.DrawFrustum(Vector3.zero, mCamera.fieldOfView, mCamera.farClipPlane, mCamera.nearClipPlane, mCamera.aspect);
-            Gizmos.matrix = save_mat;
-            mViewObject.localPosition = new Vector3(view_pos.x, view_pos.y, -view_pos.z);
-            mViewSpacePosition = mViewObject.localPosition;
-
-            //Clip
-            var clip_pos = mCamera.projectionMatrix * view_pos;
-            Gizmos.DrawWireCube(mClipSpace.transform.position, new Vector3(clip_pos.w, clip_pos.w, clip_pos.w) * 2);
-            mClipSize = clip_pos.w;
-            var clip_coord = new Vector3(clip_pos.x, clip_pos.y, clip_pos.z);
-            //Gizmos.DrawSphere(mClipSpace.transform.position + clip_coord, 0.05f);
-            mClipObject.localPosition = clip_coord;
-            mClipSpacePosition = mClipObject.localPosition;
-
-            //NDC
-            var ndc_pos = new Vector3(clip_pos.x / clip_pos.w, clip_pos.y / clip_pos.w, clip_pos.z / clip_pos.w);
-            Gizmos.DrawWireCube(mNDCSpace.transform.position, Vector3.one * 2);
-            //ndc_pos.z = (this.LinearizeDepth(ndc_pos.z) / mCamera.farClipPlane) * 2 - 1;
-            mNDCObject.localPosition = ndc_pos;
-            mNDCSpacePosition = mNDCObject.localPosition;
-            //Gizmos.DrawSphere(mNDCSpace.transform.position + ndc_pos, 0.05f);
         }
 
         float LinearizeDepth(float depth)
