@@ -127,12 +127,12 @@
 			{
 				float v1 = hgFunc(_EnergyParams.x, cosAngle);
 				float v2 = hgFunc(_EnergyParams.y, cosAngle);
-				return mix(v1, v2, _EnergyParams.z);
+				return mix(v1, v2, clamp(cosAngle*0.5+0.5, 0.0, 1.0));
 			}
 
 			float phaseFunc(float cosAngle)
 			{
-				return phaseHZ(cosAngle);
+				return phasePBRBook(cosAngle);
 			}
 
 			float powderEffect(float value)
@@ -145,12 +145,17 @@
 			{
 				float bear_law = exp(-value);
 				float powder_sugar_effect = 1.0f - exp(-value * 2.0f);
-				return bear_law * powder_sugar_effect * 2.0f;
+				return bear_law * powder_sugar_effect * 2.5f;
 			}
 
 			float bear(float value)
 			{
 				return exp(-value);
+			}
+
+			float bearNew(float value)
+			{
+				return max(exp(-value), exp(-value * 0.25) * 0.7);
 			}
 
 			float2 squareUV(float2 uv)
@@ -205,19 +210,27 @@
 				return saturate(height_fraction);
 			}
 
-			float calculateBaseShape(in float3 uvw)
+			float calculateBaseShape(in float3 uvw, float lod)
 			{
 				float time = _Time.x;
 
-				float4 shape = _ShapeTex3D.SampleLevel(sampler_ShapeTex3D, uvw + float3(time, sin(time), -time) * _ShapeSpeedScale, 0);
+				float4 shape = _ShapeTex3D.SampleLevel(sampler_ShapeTex3D, uvw + float3(time, sin(time), -time) * _ShapeSpeedScale, lod);
 				float low_freq_fbm = dot(shape.gba, float3(0.625f, 0.25f, 0.125f));
 				float base_shape = remap(shape.r, -(1 - low_freq_fbm), 1.0, 0.0, 1.0);
 
-				return base_shape;
+				return shape.g;
 			}
 
-			float calculateDensity(float3 target, float height)
+			float calculateDensity(float3 target, float height, float lod)
 			{
+				if (height < 0.0f || height > 1.0f)
+				{
+					return 0.0f;
+				}
+
+				float3 uvw = (target * _ShapeScale * 0.01f + _CloudOffset * 0.01f);
+				float base_shape = calculateBaseShape(uvw, lod);
+
 				float time = _Time.x;
 				float cloud_type = getCloudDatas(height);
 
@@ -232,8 +245,7 @@
 					edge_z_rate = min(_EdgeLength, edge_z_length) / _EdgeLength;
 				}
 
-				float3 uvw = (target * _ShapeScale * 0.01f + _CloudOffset * 0.01f);
-				float base_shape = calculateBaseShape(uvw);
+
 				float3 base_shape_with_cloud_types = base_shape * edge_x_rate * edge_z_rate;// *cloud_type;
 
 
@@ -244,20 +256,20 @@
 				base_shape_with_coverage = base_shape_with_cloud_types * coverage;
 
 
-				float final = base_shape_with_cloud_types * remapPositive(height, 0.7, 0.8, 1.0, 0.0);
+				float final = base_shape_with_cloud_types * remapPositive(height, 0.7, 0.8, 1.0, 0.0);// *coverage;
 				if (final > 0.0f && _DetailDensityStrength > 0.0f)
 				{
 					//detail
-					float3 detail = _DetailTex3D.SampleLevel(sampler_DetailTex3D, uvw + float3(time * .4, -time, time * 0.1) * _DetailSpeedScale, 0) * _DetailDensityStrength;
+					float3 detail = _DetailTex3D.SampleLevel(sampler_DetailTex3D, uvw + float3(time * .4, -time, time * 0.1) * _DetailSpeedScale, lod) * _DetailDensityStrength;
 					float high_freq_fbm = dot(detail.rgb, float3(0.625f, 0.25f, 0.125f));
 					float high_freq_modifier = lerp(high_freq_fbm, 1.0 - high_freq_fbm, clamp(height * 10, 0.0, 1.0));
 					final = remap(final, clamp(high_freq_modifier * 0.5, 0.0, 1.0), 1.0, 0.0, 1.0);
 
-					final = max(0, final - _DensityThreshold) * _ShapeDensityStrength;
+					final = max(0.0, final - _DensityThreshold) * _ShapeDensityStrength;
 					return final;
 				}
 
-				return clamp(final - _DensityThreshold, 0.0, 1.0) * _ShapeDensityStrength;
+				return max(0.0, final - _DensityThreshold) * _ShapeDensityStrength;
 			}
 
 			float calulateLightEnergy(in float density, in float height, in float phaseValue, float step_size)
@@ -275,12 +287,19 @@
 			{
 				float temp_density = density * _LightAbsorption;
 
-				float absorption = max(exp(-temp_density), exp(-temp_density * 0.25) * 0.7);
+				float absorption = bearNew(temp_density);
 				float in_scattering = powderEffect(temp_density);
 
 				//float energy = bear(temp_density);// *phaseValue * 100;// 
-				float energy = absorption * in_scattering;// *phaseValue;
+				float energy = absorption;// *in_scattering* phaseValue;// ;// *phaseValue;//absorption;// *in_scattering;// *phaseValue;
 				return _DarknessThreshold + energy * (1 - _DarknessThreshold);
+			}
+
+			bool isOutOfBox(in float3 pos)
+			{
+				return pos.y > _BoxMax.y || pos.y < _BoxMin.y
+					|| pos.x > _BoxMax.x || pos.x < _BoxMin.x
+					|| pos.z > _BoxMax.z || pos.z < _BoxMin.z;
 			}
 
 			float calculateLightTransmittance(in float3 pos, in float3 lightDir)
@@ -296,12 +315,19 @@
 				//	float3(-0.16852403,  0.14748697,  0.97460106)
 				//};
 
-
 				float2 box_info = rayBoxDst(_BoxMin, _BoxMax, pos, lightDir);
 				float dst_inside_box = box_info.y;
+				if (dst_inside_box <= 0)
+				{
+					return 0;
+				}
+
 				int step = 6;
 				float step_size = dst_inside_box / step;
 				float total_density = 0;
+
+				step_size = 10;
+				step = dst_inside_box / step_size;
 
 				// 生成圆锥信息
 				//float3 light_step = step_size * lightDir;
@@ -310,19 +336,68 @@
 				//float coneRadius = 1.0;
 				//float coneStep = 1.0 / 6;
 
+				//step_size = remap(step_size, 0.0, )
 
+				float3 step_dir_length = lightDir * step_size;
+				float3 begin_pos = pos;// +step_dir_length;
 				for (int i = 0; i <= step; i++)
 				{
-					float3 p = pos + (lightDir * step_size * i);
-					float height = getHeightFractionForPoint(p, float2(_BoxMin.y, _BoxMax.y));
+					if (isOutOfBox(begin_pos))
+					{
+						break;
+					}
+
+					float height = getHeightFractionForPoint(begin_pos, float2(_BoxMin.y, _BoxMax.y));
 					//float3 p = pos + coneRadius * (cone_spread_multiplier * noise_kernel[i] * float(i));
-					float density = calculateDensity(p, height);
+					float density = calculateDensity(begin_pos, height, (int)(_CloudColorBlack.w * 10));
 					total_density += max(0, density * step_size);
 
+					if (total_density > 12.f)
+					{
+						//total_density = 0;
+						break;
+					}
+
+					begin_pos += step_dir_length;
 					//coneRadius += coneStep;
 				}
 
+
 				return total_density;
+			}
+
+			float3 debugTransmittanceCount(int loopCount)
+			{
+				if (loopCount == 1)
+				{
+					return float3(1.0, 0.0, 0.0);
+				}
+				else if (loopCount == 2)
+				{
+					return float3(0.0, 1.0, 0.0);
+				}
+				else if (loopCount == 3)
+				{
+					return float3(0.0, 0.0, 1.0);
+				}
+				else if (loopCount == 4)
+				{
+					return float3(1.0, 1.0, 0.0);
+				}
+				else if (loopCount == 5)
+				{
+					return float3(1.0, 0.0, 1.0);
+				}
+				else if (loopCount == 6)
+				{
+					return float3(0.0, 1.0, 1.0);
+				}
+				else if (loopCount == 7)
+				{
+					return float3(1.0, 1.0, 1.0);
+				}
+
+				return float3(0.0, 0.0, 0.0);
 			}
 
 			//return xyz=LightEnergy w=Transmittance
@@ -351,39 +426,47 @@
 				float cloud_thickness = dst_inside_box;
 				float step_thickness = _StepThickness;
 				float total_thickness = random_offset;
-				float3 begin_pos = rayOrg + rayDir * dst_to_box;
 
+				float3 begin_pos = rayOrg + rayDir * (dst_to_box + random_offset);
+				float3 step_dir_length = rayDir * step_thickness;
+
+				int loop_count = 0;
 				float total_density = 0;
 
-				while (total_thickness < cloud_thickness)
+				while (total_thickness <= cloud_thickness)
 				{
 					if (total_thickness + dst_to_box > depth)
 					{
 						break;
 					}
 
-					float3 p = begin_pos + rayDir * total_thickness;
-					total_thickness += step_thickness;
+					loop_count++;
 
-					float height = getHeightFractionForPoint(p, float2(_BoxMin.y, _BoxMax.y));
-					float step_density = calculateDensity(p, height);
+					float height = getHeightFractionForPoint(begin_pos, float2(_BoxMin.y, _BoxMax.y));
+					float step_density = calculateDensity(begin_pos, height, (int)(_CloudColorBlack.w * 10));
 					total_density += step_density;
 
 					if (step_density > 0.0f)
 					{
-						float light_transmittance = calculateLightTransmittance(p, lightDir);
+						float light_transmittance = calculateLightTransmittance(begin_pos, lightDir);
 						light_total_energy += step_thickness * step_density * transmittance * calulateLightEnergy(light_transmittance, phase);
-						transmittance *= bear(step_thickness * step_density * _CloudAbsorption);
+						transmittance *= bearNew(step_thickness * step_density * _CloudAbsorption);
 
 						if (transmittance < 0.01f)
 						{
 							break;
 						}
 					}
+
+					total_thickness += step_thickness;
+					begin_pos += step_dir_length;
 				}
 
 				//light_total_energy.z = total_density;
-				return float4(light_total_energy, transmittance);
+				//light_total_energy = debugTransmittanceCount(loop_count);
+
+				//return float4(total_density, total_density, total_density, transmittance);
+				return float4(light_total_energy * _CloudColor.w, transmittance);
 			}
 
 			v2f vert(appdata v)
@@ -418,21 +501,23 @@
 				float3 cloud_col = col_params.xyz * _LightColor0
 					+ col_params.xyz * UNITY_LIGHTMODEL_AMBIENT.xyz
 					+ col_params.xyz * forwardScattering * _ForwardScatteringScale;
+				//+ col_params.xyz * col;
 
-				//if (col_params.z > 0.99)
-				//{
-				//	cloud_col.z = 1;
-				//}
+			//if (col_params.z > 0.99)
+			//{
+			//	cloud_col.z = 1;
+			//}
 
-				//float3 col_l = lerp(_CloudColorLight, _LightColor0, col_params.x);
-				//float3 col_d = lerp(_CloudColorBlack, _CloudColorLight, col_params.x);
-				//cloud_col = lerp(col_d, col_l, col_params.x) * (1 - col_params.w);
+			//float3 col_l = lerp(_CloudColorLight, _LightColor0, col_params.x);
+			//float3 col_d = lerp(_CloudColorBlack, _CloudColorLight, col_params.x);
+			//cloud_col = lerp(col_d, col_l, col_params.x) * (1 - col_params.w);
 
-				col = col * col_params.w + cloud_col;
+			col = col * col_params.w + cloud_col;
+			//col = cloud_col;
 
-				return float4(col, 1);
-			}
-			ENDCG
+			return float4(col, 1);
 		}
+		ENDCG
+	}
 	}
 }

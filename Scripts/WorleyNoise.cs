@@ -32,7 +32,7 @@ namespace tezcat.Framework.Exp
         public bool mFlipWorleyNoise = false;
 
         [Header("Perlin Noise")]
-        [Range(1, 6)]
+        [Range(1, 10)]
         public int mOctave = 4;
         [Min(1.0f)]
         public float mFrequency = 1.0f;

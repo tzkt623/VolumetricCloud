@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.44563276, g: 0.49532437, b: 0.5741882, a: 1}
+  m_IndirectSpecularColor: {r: 0.450063, g: 0.50011164, b: 0.5754839, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -786,7 +786,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1182117739}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.21751681, y: -57, z: -852}
+  m_LocalPosition: {x: -0.21751681, y: -5, z: -852}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -805,14 +805,17 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   mCamera: {fileID: 1182117741}
-  mDrawAllRay: 1
+  mDrawGizmos: 0
+  mDectetRayMode: 1
   mLight: {fileID: 1991451969}
   mBox: {fileID: 1361336275}
-  mStepSize: 169.8
-  mDetectSphereRadius: 14.9
-  mDrawLight: 1
-  mDrawDetectRay: 1
+  mStepSize: 251.7
+  mStepCount: 5
+  mDetectSphereRadius: 8.3
+  mDrawAllRay: 1
   mDrawCameraRay: 0
+  mDrawDetectRay: 1
+  mDrawLight: 1
 --- !u!114 &1182117744
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -938,27 +941,27 @@ MonoBehaviour:
   mDetailNoise: {fileID: 1975134052}
   mShader: {fileID: 4800000, guid: d8b610382de4a02489774d831873d14f, type: 3}
   mWeatherTexture2D: {fileID: 2800000, guid: ef7a2acc27d031e4ba6390e8565f4b85, type: 3}
-  mStepThickness: 1
+  mStepThickness: 10
   mShapeDensityStrength: 1
-  mDensityThreshold: 0.38
+  mDensityThreshold: 0.56
   mShapeScale: 0.1
   mDetailDensityStrength: 0
-  mEdgeLength: 20
+  mEdgeLength: 100
   mCloudColor: {r: 1, g: 1, b: 1, a: 1}
   mCloudColorLight: {r: 0.9438412, g: 0.990566, b: 0.990566, a: 1}
-  mCloudColorBlack: {r: 0, g: 0, b: 0, a: 1}
+  mCloudColorBlack: {r: 0, g: 0, b: 0, a: 0}
   mCloudColorOffset: {x: 0.5, y: 0.04}
   mDarknessThreshold: 0
   mCloudAbsorption: 1
-  mLightAbsorption: 0.33
-  mEneryParams: {x: 0.5, y: 0.2, z: 0.51, w: 0}
-  mForwardScatteringScale: 1.58
+  mLightAbsorption: 1.3
+  mEneryParams: {x: -0.72, y: 0.72, z: 1.57, w: 0.64}
+  mForwardScatteringScale: 0
   mCloudOffset: {x: 0, y: 0, z: 0}
   mCloudSpeed: {x: 0, y: 0, z: 0}
   mShapeSpeedScale: {x: 0, y: 0, z: 0}
   mDetailSpeedScale: {x: 0, y: 0, z: 0}
   mBlueNoise: {fileID: 2800000, guid: 74b510599ad2c73458d30bec8f14998b, type: 3}
-  mBlueNoiseIntensity: 0
+  mBlueNoiseIntensity: 20
   mEnableBilateralBlur: 0
   mBlurShader: {fileID: 4800000, guid: d049b6787b291e14fb15d50516b39c1f, type: 3}
   mBlurParams: {x: 9, y: 9, z: 2}
@@ -970,7 +973,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1361336271}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 125, z: 0}
   m_LocalScale: {x: 1000, y: 491.34753, z: 1000}
   m_Children: []
   m_Father: {fileID: 0}
@@ -1089,7 +1092,7 @@ MonoBehaviour:
   mResolution: 128
   mGridCountArray: 04000000080000001000000020000000
   mFlipWorleyNoise: 1
-  mOctave: 4
+  mOctave: 7
   mFrequency: 4
   mLacunarity: 4
   mPersistence: 0.5
@@ -1203,10 +1206,10 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1991451968}
-  m_LocalRotation: {x: -0.0810166, y: -0.47328618, z: 0.8649941, w: 0.14567678}
+  m_LocalRotation: {x: 0.23427705, y: 0.91209364, z: -0.30591923, w: 0.14004588}
   m_LocalPosition: {x: 0, y: 3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 1
-  m_LocalEulerAnglesHint: {x: 52.672, y: -27.293001, z: 147.175}
+  m_LocalEulerAnglesHint: {x: 141.415, y: -8.247009, z: -154.081}

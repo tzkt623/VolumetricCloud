@@ -101,6 +101,7 @@ namespace tezcat.Framework.Exp
                             wrapMode = TextureWrapMode.Repeat,
                             filterMode = FilterMode.Bilinear,
                             enableRandomWrite = true,
+                            autoGenerateMips = true
                         };
                         mShapeRenderTexture.Create();
                         onTextureCreated?.Invoke(mShapeRenderTexture);
@@ -130,6 +131,7 @@ namespace tezcat.Framework.Exp
                             wrapMode = TextureWrapMode.Repeat,
                             filterMode = FilterMode.Bilinear,
                             enableRandomWrite = true,
+                            useMipMap = true,
                             autoGenerateMips = true
                         };
                         mShapeRenderTexture.Create();

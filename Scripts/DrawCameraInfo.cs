@@ -6,19 +6,30 @@ namespace tezcat.Framework.Exp
 {
     public class DrawCameraInfo : MonoBehaviour
     {
+        public enum DectetRayMode
+        {
+            BaseOnInsideLength,
+            BaseOnFixedStepLength
+        }
+
         [Header("Base")]
         public Camera mCamera;
-        public bool mDrawAllRay = false;
+        public bool mDrawGizmos = false;
 
         [Header("Cloud Info")]
+        public DectetRayMode mDectetRayMode = DectetRayMode.BaseOnInsideLength;
+
         public Light mLight;
         public Transform mBox;
         [Min(0.1f)]
         public float mStepSize = 10;
+        [Range(2, 10)]
+        public int mStepCount = 10;
         public float mDetectSphereRadius = 1;
-        public bool mDrawLight = false;
-        public bool mDrawDetectRay = false;
+        public bool mDrawAllRay = false;
         public bool mDrawCameraRay = false;
+        public bool mDrawDetectRay = false;
+        public bool mDrawLight = false;
 
         void Start()
         {
@@ -27,7 +38,10 @@ namespace tezcat.Framework.Exp
 
         private void OnDrawGizmos()
         {
-            this.drawRay();
+            if (mDrawGizmos)
+            {
+                this.draw();
+            }
         }
 
         static Vector3 divide(Vector3 a, Vector3 b)
@@ -53,7 +67,7 @@ namespace tezcat.Framework.Exp
             return new Vector2(dstToBox, dstInBox);
         }
 
-        private void drawRay()
+        private void draw()
         {
             var resolution = Screen.currentResolution;
             var camera_pos = mCamera.transform.position;
@@ -99,16 +113,27 @@ namespace tezcat.Framework.Exp
                             float dst_inside_box = box_info.y;
 
                             float threshold = dst_inside_box / mStepSize;
-                            if (dst_inside_box > 0 && threshold <= 20)
+                            if (dst_inside_box > 0 && threshold <= mStepCount)
                             {
                                 Gizmos.color = Color.cyan;
                                 Gizmos.DrawLine(camera_pos, camera_pos + ray_dir * dst_to_box);
 
-
-                                float step_size = mStepSize;
+                                float step_size = 0;
                                 float total_size = 0;
 
-                                while (total_size < dst_inside_box)
+                                switch (mDectetRayMode)
+                                {
+                                    case DectetRayMode.BaseOnInsideLength:
+                                        step_size = dst_inside_box / (mStepCount - 1);
+                                        break;
+                                    case DectetRayMode.BaseOnFixedStepLength:
+                                        step_size = mStepSize;
+                                        break;
+                                    default:
+                                        break;
+                                }
+
+                                while (total_size <= dst_inside_box)
                                 {
                                     Vector3 p = camera_pos + ray_dir * (dst_to_box + total_size);
                                     total_size += step_size;
@@ -128,30 +153,29 @@ namespace tezcat.Framework.Exp
                 }
             }
 
+            {
+                Gizmos.DrawWireSphere(camera_pos, 0.02f);
 
-            Gizmos.DrawWireSphere(camera_pos, 0.02f);
+                //draw near plane
+                Gizmos.DrawWireSphere(near_center_pos, 0.02f);
+                Gizmos.DrawWireSphere(lb, 0.02f);
+                Gizmos.DrawWireSphere(rt, 0.02f);
+                Gizmos.DrawLine(near_center_pos - right_offset, near_center_pos + right_offset);
+                Gizmos.DrawLine(near_center_pos - up_offset, near_center_pos + up_offset);
 
+                var near_up_sp = near_center_pos + mCamera.transform.up * near_height;
+                Gizmos.DrawWireSphere(near_up_sp, 0.02f);
 
-            //draw near plane
-            Gizmos.DrawWireSphere(near_center_pos, 0.02f);
-            Gizmos.DrawWireSphere(lb, 0.02f);
-            Gizmos.DrawWireSphere(rt, 0.02f);
-            Gizmos.DrawLine(near_center_pos - right_offset, near_center_pos + right_offset);
-            Gizmos.DrawLine(near_center_pos - up_offset, near_center_pos + up_offset);
+                //draw far plane
+                var far_sp = camera_pos + mCamera.transform.forward * mCamera.farClipPlane;
+                Gizmos.DrawWireSphere(far_sp, 0.02f);
+                Gizmos.DrawLine(far_sp - right_offset * rate_fDn, far_sp + right_offset * rate_fDn);
+                Gizmos.DrawLine(far_sp - up_offset * rate_fDn, far_sp + up_offset * rate_fDn);
 
-            var near_up_sp = near_center_pos + mCamera.transform.up * near_height;
-            Gizmos.DrawWireSphere(near_up_sp, 0.02f);
-
-            //draw far plane
-            var far_sp = camera_pos + mCamera.transform.forward * mCamera.farClipPlane;
-            Gizmos.DrawWireSphere(far_sp, 0.02f);
-            Gizmos.DrawLine(far_sp - right_offset * rate_fDn, far_sp + right_offset * rate_fDn);
-            Gizmos.DrawLine(far_sp - up_offset * rate_fDn, far_sp + up_offset * rate_fDn);
-
-            var rate = mCamera.nearClipPlane / mCamera.farClipPlane;
-            var dir = near_up_sp - camera_pos;
-            var far_up_sp = camera_pos + dir / rate;
-            Gizmos.DrawWireSphere(far_up_sp, 0.02f);
+                var dir = near_up_sp - camera_pos;
+                var far_up_sp = camera_pos + dir * rate_fDn;
+                Gizmos.DrawWireSphere(far_up_sp, 0.02f);
+            }
         }
 
         private void lightRayMatch(Vector3 pos, float stepSize, Vector3 boxMin, Vector3 boxMax)
@@ -162,17 +186,35 @@ namespace tezcat.Framework.Exp
             var box_info = rayBoxDst(boxMin, boxMax, pos, light_dir);
             float dst_to_box = box_info.x;
             float dst_inside_box = box_info.y;
+            if (dst_inside_box <= 0)
+            {
+                return;
+            }
+
             Gizmos.DrawLine(pos, pos + light_dir * dst_inside_box);
 
-            int step = (int)(dst_inside_box / stepSize);
-            float step_size = stepSize;
+            int step = 0;
+            float step_size = 0;
 
-            for (int i = 1; i < step; i++)
+            switch (mDectetRayMode)
+            {
+                case DectetRayMode.BaseOnInsideLength:
+                    step = mStepCount;
+                    step_size = dst_inside_box / mStepCount;
+                    break;
+                case DectetRayMode.BaseOnFixedStepLength:
+                    step_size = mStepSize;
+                    step = (int)(dst_inside_box / step_size);
+                    break;
+                default:
+                    break;
+            }
+
+            for (int i = 1; i <= step; i++)
             {
                 Vector3 p = pos + light_dir * (step_size * i);
                 Gizmos.DrawWireSphere(p, mDetectSphereRadius);
             }
-            Gizmos.color = Color.white;
         }
 
         float LinearizeDepth(float depth)
