@@ -5,9 +5,11 @@ using UnityEngine;
 namespace tezcat.Framework.Exp
 {
     [ImageEffectAllowedInSceneView]
-    public class CloudBoxCamera : MonoBehaviour
+    public class CloudBoxCamera 
+        : MonoBehaviour
     {
-        public CloudBox mCloudBox;
+
+        public CloudRenderer mCloudBox;
 
         void Start()
         {
@@ -16,7 +18,7 @@ namespace tezcat.Framework.Exp
 
         private void OnRenderImage(RenderTexture source, RenderTexture destination)
         {
-            mCloudBox.renderCloudBox(source, destination);
+            mCloudBox.rendering(source, destination);
         }
     }
 }

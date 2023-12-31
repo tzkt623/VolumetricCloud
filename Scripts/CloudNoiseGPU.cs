@@ -9,13 +9,14 @@ namespace tezcat.Framework.Exp
     public class CloudNoiseGPU : WorleyNoise
     {
         public event System.Action<RenderTexture> onTextureCreated;
-        public RenderTexture renderTexture => mShapeRenderTexture;
+        public RenderTexture shapeTexture => mShapeRenderTexture;
+        public RenderTexture perlinNoiseTexture => mShapePerlinNoiseTexture;
 
         public ComputeShader mComputeShader;
         private int mCSKernel;
         private ComputeBuffer[] mSamplePointBuffers;
-        private RenderTexture mShapeRenderTexture;
-        private RenderTexture mShapePerlinNoiseTexture;
+        private RenderTexture mShapeRenderTexture = null;
+        private RenderTexture mShapePerlinNoiseTexture = null;
 
         public Renderer mPerlinNosieRenderer;
 
@@ -125,7 +126,7 @@ namespace tezcat.Framework.Exp
 
                         mShapeRenderTexture = new RenderTexture(mResolution, mResolution, 0, GraphicsFormat.R16G16B16A16_UNorm)
                         {
-                            name = "Shap",
+                            name = "Shape",
                             volumeDepth = mResolution,
                             dimension = TextureDimension.Tex3D,
                             wrapMode = TextureWrapMode.Repeat,
@@ -139,7 +140,7 @@ namespace tezcat.Framework.Exp
 
                         mShapePerlinNoiseTexture = new RenderTexture(mResolution, mResolution, 0, GraphicsFormat.R16_UNorm)
                         {
-                            name = "Shap",
+                            name = "Perlin",
                             volumeDepth = mResolution,
                             dimension = TextureDimension.Tex3D,
                             wrapMode = TextureWrapMode.Repeat,

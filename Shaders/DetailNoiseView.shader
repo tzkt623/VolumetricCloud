@@ -6,8 +6,10 @@
     }
     SubShader
     {
-        Tags { "RenderType"="Opaque" }
+        Tags { "RenderType" = "Opaque" }
         LOD 100
+        ZWrite On
+        ZTest LEqual
 
         Pass
         {
@@ -57,6 +59,9 @@
                 case 2:
                     col.rgb = tex3D(_DetailTex3D, i.uvw).bbb;
                     //col.rgb = float4(0, 0, 1, 0);
+                    break;
+                case 3:
+                    col.rgb = tex3D(_DetailTex3D, i.uvw).aaa;
                     break;
                 }
 

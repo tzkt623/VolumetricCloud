@@ -150,7 +150,6 @@
 				fixed4 finalColor = 1.0f;
 				finalColor.rgb = 1.0f - tex2D(_MainTex, i.uv).rgb;
 
-
 				return finalColor;
 			}
 			ENDCG

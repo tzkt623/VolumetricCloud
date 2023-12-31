@@ -1,9 +1,9 @@
 ﻿#pragma kernel main2D
 #pragma kernel main3D
 
-#include "PerlinNoise.compute"
-#include "WorleyNoise.compute"
-#include "Function.compute"
+#include "PerlinNoise.cginc"
+#include "WorleyNoise.cginc"
+#include "Function.cginc"
 
 
 RWTexture2D<float4> outTex2D;
@@ -76,31 +76,27 @@ float calculateWorleyNoise(in StructuredBuffer<int3> samplePoints
 
 	for (int o = 0; o < octave; o++)
 	{
-		if (inFlip)
-		{
-			noise += (1 - getNoiseF(samplePoints, inResolution
-				, pos * freq + inOffset
-				, gridCount, grid_length, grid_rate)) * strength;
-		}
-		else
-		{
-			noise += getNoiseF(samplePoints, inResolution
-				, pos * freq + inOffset
-				, gridCount, grid_length, grid_rate) * strength;
-		}
+		noise += getNoiseF(samplePoints, inResolution
+			, pos * freq + inOffset
+			, gridCount, grid_length, grid_rate) * strength;
 
 
 		sum_strength += strength;
 		freq *= 2.0f;
-		strength *= 0.3f;
+		strength *= 0.6f;
 	}
 
 	noise /= sum_strength;
 
+	if (inFlip)
+	{
+		return 1 - noise;
+	}
+
 	return noise;
 }
 
-float calculatePerlinNoise(float3 pos)
+float calculatePerlinNoise(in float3 pos)
 {
 	float freq = floor(inFrequency);
 	float strength = 1.0f;
@@ -108,7 +104,7 @@ float calculatePerlinNoise(float3 pos)
 	float noise = 0;
 	for (int o = 0; o < inOctave; o++)
 	{
-		noise += pnoise(pos * freq + inOffset, freq) * strength;
+		noise += pnoise(pos * freq, freq) * strength;
 		sum_strength += strength;
 
 		freq *= inLacunarity;
@@ -124,10 +120,7 @@ float calculatePerlinNoise(float3 pos)
 [numthreads(8, 8, 2)]
 void main3D(uint3 id : SV_DispatchThreadID)
 {
-	float3 pos = float3
-		(id.x / (float)inResolution
-			, id.y / (float)inResolution
-			, id.z / (float)inResolution);
+	float3 pos = id / (float)inResolution;
 
 	float worley00 = calculateWorleyNoise(inSamplePoint3D0
 		, pos, 1, 3
@@ -145,12 +138,12 @@ void main3D(uint3 id : SV_DispatchThreadID)
 		, pos, 1, 3
 		, 32);
 
-	float worley_fbm = dot(float3(worley00, worley01, worley02), float3(0.625, 0.25, 0.125));
-
-
 	float perlin = clamp(calculatePerlinNoise(pos), 0, 1);
-	float perlin_worley = remap(perlin, worley_fbm-1, 1.0f, 0.0, 1.0f);
+	float perlin_worley = remap(perlin, 0.0, 1.0, worley00, 1.0f);
+	perlin_worley = worley00 - perlin * (1 - worley00);
+	float fbm = dot(float3(worley00, worley01, worley02), float3(0.625, 0.25, 0.125));
+	//float cloud = remap(perlin_worley, fbm - 1, 1.0, 0.0, 1.0);
 
-	outShapeTex3D[id] = float4(perlin_worley, worley_fbm, worley02, worley03);
+	outShapeTex3D[id] = float4(perlin_worley, worley00, worley01, worley02);
 	outShapePerlinNoiseTex3D[id] = perlin;
 }

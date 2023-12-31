@@ -6,8 +6,10 @@
     }
     SubShader
     {
-        Tags { "RenderType"="Opaque" }
+        Tags { "RenderType" = "Opaque" }
         LOD 100
+        ZWrite On
+        ZTest LEqual
 
         Pass
         {

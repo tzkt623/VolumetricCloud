@@ -1,6 +1,6 @@
 ﻿#pragma kernel main3D
 
-#include "WorleyNoise.compute"
+#include "WorleyNoise.cginc"
 
 RWTexture3D<float4> outDetailTex3D;
 StructuredBuffer<int3> inSamplerPoint0;
@@ -22,7 +22,7 @@ float calculateWorleyNoise(in StructuredBuffer<int3> samplerPoint, in int gridCo
 	float strength = 1.0f;
 	float sum_strength = 1.0f;
 	float noise = 0;
-	for (int o = 0; o < 2; o++)
+	for (int o = 0; o < 3; o++)
 	{
 		if (inFlip)
 		{
@@ -34,7 +34,7 @@ float calculateWorleyNoise(in StructuredBuffer<int3> samplerPoint, in int gridCo
 			noise += getNoiseF(samplerPoint, inResolution, pos * freq + inOffset, gridCount, gridLength, rate) * strength;
 		}
 		freq *= 2.0f;
-		strength *= 0.3f;
+		strength *= 0.5f;
 		sum_strength += strength;
 	}
 
@@ -65,5 +65,7 @@ void main3D(uint3 id : SV_DispatchThreadID)
 		inSamplerPoint2, grid_count2, inResolution / grid_count2, 1.0 / grid_count2
 		, pos, 1);
 
-	outDetailTex3D[id] = float4(worley00, worley01, worley02, 0);
+	float worley_fbm = dot(float3(worley00, worley01, worley02), float3(0.625, 0.25, 0.125));
+
+	outDetailTex3D[id] = float4(worley00, worley01, worley02, worley_fbm);
 }

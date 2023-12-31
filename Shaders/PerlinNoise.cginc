@@ -1,7 +1,7 @@
 ﻿#ifndef Perlin_Noise
 #define Perlin_Noise
 
-#include "Function.compute"
+#include "Function.cginc"
 
 //-------------------------------------
 // Description : Array and textureless GLSL 2D/3D/4D simplex 

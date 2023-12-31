@@ -2,14 +2,15 @@
 {
 	Properties
 	{
-		_MainTex2D("Texture", 2D) = "white" {}
-		_MainTex3D("Texture", 3D) = "white" {}
+
 	}
-		SubShader
+	SubShader
 	{
 		Tags { "RenderType" = "Opaque" }
+		LOD 100
+
 		ZWrite On
-		//ZTest Always
+		ZTest LEqual
 
 		Pass
 		{
@@ -52,15 +53,15 @@
 			float4 frag(v2f i) : SV_Target
 			{
 				// sample the texture
-				float4 col = 0;
+				float4 col = 1;
 				if (_Dimension == 2)
 				{
 					col = tex2D(_MainTex2D, i.uv);
 				}
-
-				if (_Dimension == 3)
+				else if (_Dimension == 3)
 				{
-					float4 colors = tex3D(_MainTex3D, i.uv3);
+					//mipmap有bug
+					float4 colors = tex3Dlod(_MainTex3D, float4(i.uv3, 0));
 
 					switch (_Channel)
 					{
@@ -78,6 +79,12 @@
 						break;
 					case 4:
 						col.rgb = colors.gba;
+						break;
+					case 5:
+						col.rgb = dot(colors.gba, float3(0.625, 0.25, 0.125));
+						break;
+					default:
+						col.rgb = float3(1, 0, 1);
 						break;
 					}
 				}
