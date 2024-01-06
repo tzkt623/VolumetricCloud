@@ -13,6 +13,7 @@ namespace tezcat.Framework.Exp
         public RenderTexture perlinNoiseTexture => mShapePerlinNoiseTexture;
 
         public ComputeShader mComputeShader;
+        public DetailNoise mDetailNoise;
         private int mCSKernel;
         private ComputeBuffer[] mSamplePointBuffers;
         private RenderTexture mShapeRenderTexture = null;
@@ -63,10 +64,11 @@ namespace tezcat.Framework.Exp
 
         private void intiData()
         {
+            mDetailNoise.onTextureCreated += onDetailNoiseTextureCreated;
+
             mSamplePointBuffers = new ComputeBuffer[4];
 
             mComputeShader.SetInt("inDimension", (int)mDimension);
-
             mComputeShader.SetInt("inResolution", mResolution);
 
 //             shaderGridLengthArray = this.converToShaderPackage(mGridLengthArray);
@@ -161,16 +163,29 @@ namespace tezcat.Framework.Exp
                         foreach (var item in mRenderers)
                         {
                             item.material.SetInt("_Dimension", (int)mDimension);
-                            item.material.SetTexture("_MainTex3D", mShapeRenderTexture);
+                            item.material.SetTexture("_ShapeTex3D", mShapeRenderTexture);
+
+                            if(mDetailNoise.renderTexture != null)
+                            {
+                                item.material.SetTexture("_DetailTex3D", mDetailNoise.renderTexture);
+                            }
                         }
 
-                        mPerlinNosieRenderer.material.SetTexture("_MainTex3D", mShapePerlinNoiseTexture);
+                        mPerlinNosieRenderer.material.SetTexture("_ShapeTex3D", mShapePerlinNoiseTexture);
 
                         mComputeShader.Dispatch(mCSKernel, mResolution / 8, mResolution / 8, mResolution / mCSThreadZ);
                     }
                     break;
                 default:
                     break;
+            }
+        }
+
+        private void onDetailNoiseTextureCreated(RenderTexture tex)
+        {
+            foreach (var item in mRenderers)
+            {
+                item.material.SetTexture("_DetailTex3D", tex);
             }
         }
 

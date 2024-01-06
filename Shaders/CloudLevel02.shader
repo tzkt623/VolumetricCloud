@@ -41,17 +41,7 @@
 				float dst_to_begin_pos;
 				float cloud_thickness;
 
-				if (_DrawPlanetArea)
-				{
-					if (!calculatePlanetCloudData(_ViewPosition, _PlanetData, _PlanetCloudThickness, rayOrg, rayDir, cloud_area_data))
-					{
-						return 0.0;
-					}
-
-					dst_to_begin_pos = cloud_area_data.x;
-					cloud_thickness = cloud_area_data.y;
-				}
-				else
+				if (_DrawAreaIndex == AREA_BOX)
 				{
 					cloud_area_data = rayBoxDst(_BoxMin, _BoxMax, rayOrg, rayDir);
 					dst_to_begin_pos = cloud_area_data.x;
@@ -60,6 +50,16 @@
 					{
 						return 0.0;
 					}
+				}
+				else
+				{
+					if (!calculatePlanetCloudData(_ViewPosition, _PlanetData, _PlanetCloudThickness, rayOrg, rayDir, cloud_area_data))
+					{
+						return 0.0;
+					}
+
+					dst_to_begin_pos = cloud_area_data.x;
+					cloud_thickness = cloud_area_data.y;
 				}
 
 				float transmittance = 1;
@@ -71,14 +71,12 @@
 					random_offset = _BlueNoiseTex2D.SampleLevel(sampler_BlueNoiseTex2D, squareUV(uv * 3), 0) * _BlueNoiseIntensity;
 				}
 
-				float step_thickness = cloud_thickness / _StepThickness;
+				float step_thickness = cloud_thickness / _StepCount;
 				float total_thickness = random_offset + step_thickness;
 
 				float3 begin_pos = rayOrg + rayDir * (dst_to_begin_pos + random_offset);
 				float3 step_dir_length = rayDir * step_thickness;
 
-				int zero_count = 0;
-				float pre_density = 0;
 				float total_density = 0;
 				float test_density = 0;
 

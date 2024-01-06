@@ -18,7 +18,6 @@ namespace tezcat.Framework.Exp
         public bool mFlip = false;
         int mGridLength = 4;
 
-
         public event System.Action<RenderTexture> onTextureCreated;
         public RenderTexture renderTexture => mDetailRenderTexture;
 
@@ -96,7 +95,6 @@ namespace tezcat.Framework.Exp
             mDetailRenderTexture.Create();
             onTextureCreated?.Invoke(mDetailRenderTexture);
 
-
             mCSKernel = mComputeShader.FindKernel("main3D");
             mComputeShader.SetTexture(mCSKernel, "outDetailTex3D", mDetailRenderTexture);
 
@@ -124,17 +122,17 @@ namespace tezcat.Framework.Exp
             mComputeShader.Dispatch(mCSKernel, mResolution / 8, mResolution / 8, mResolution / 2);
         }
 
+        public void init()
+        {
+
+        }
+
         private void OnDestroy()
         {
             foreach (var item in mBuffers)
             {
                 item?.Release();
             }
-        }
-
-        // Update is called once per frame
-        void Update()
-        {
         }
     }
 }

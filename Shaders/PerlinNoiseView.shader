@@ -30,7 +30,7 @@
                 float4 vertex : SV_POSITION;
             };
 
-            sampler3D _MainTex3D;
+            sampler3D _ShapeTex3D;
 
             v2f vert (appdata v)
             {
@@ -43,7 +43,7 @@
             float4 frag (v2f i) : SV_Target
             {
                 // sample the texture
-                float4 col = float4(tex3D(_MainTex3D, i.uvw).rrr, 1.0f);
+                float4 col = float4(tex3D(_ShapeTex3D, i.uvw).rrr, 1.0f);
                 return col;
             }
             ENDCG

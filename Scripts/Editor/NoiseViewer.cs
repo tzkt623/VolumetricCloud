@@ -10,6 +10,7 @@ namespace tezcat.Framework.Exp
     {
         CloudNoiseGPU mNoise;
         Material mTexMat = null;
+        Vector2 mSPos = new Vector2();
 
         private void OnEnable()
         {
@@ -20,18 +21,16 @@ namespace tezcat.Framework.Exp
         {
             this.DrawDefaultInspector();
 
-            EditorGUILayout.BeginHorizontal();
-            if(GUILayout.Button("Generate"))
+            /*
+            GUILayout.Label("Channels");
+            EditorGUI.Popup(EditorGUILayout.GetControlRect(), "Channels", 0, new[]{ "haha", "hehe" });
+            mSPos = GUILayout.BeginScrollView(mSPos, new GUILayoutOption[] { GUILayout.Height(128) });
+            for (int i = 0; i < 10; i++)
             {
-
+                GUILayout.Toggle(false, i.ToString());
             }
-
-            if (GUILayout.Button("Update"))
-            {
-
-            }
-
-            EditorGUILayout.EndHorizontal();
+            GUILayout.EndScrollView();
+            */
         }
     }
 }

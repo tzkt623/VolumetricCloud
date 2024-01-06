@@ -139,11 +139,11 @@ void main3D(uint3 id : SV_DispatchThreadID)
 		, 32);
 
 	float perlin = clamp(calculatePerlinNoise(pos), 0, 1);
-	float perlin_worley = remap(perlin, 0.0, 1.0, worley00, 1.0f);
-	perlin_worley = worley00 - perlin * (1 - worley00);
-	float fbm = dot(float3(worley00, worley01, worley02), float3(0.625, 0.25, 0.125));
+	float perlin_worley = remapPositive(perlin, worley00, 1.0f, 0.0f, 1.0f);
+	//perlin_worley = worley00 - perlin * (1 - worley00);
+	//float fbm = dot(float3(worley00, worley01, worley02), float3(0.625, 0.25, 0.125));
 	//float cloud = remap(perlin_worley, fbm - 1, 1.0, 0.0, 1.0);
 
-	outShapeTex3D[id] = float4(perlin_worley, worley00, worley01, worley02);
+	outShapeTex3D[id] = float4(perlin_worley, worley01, worley02, worley03);
 	outShapePerlinNoiseTex3D[id] = perlin;
 }

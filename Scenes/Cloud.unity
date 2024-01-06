@@ -189,6 +189,36 @@ Transform:
   m_Father: {fileID: 1975134051}
   m_RootOrder: 2
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &478057460
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 478057461}
+  m_Layer: 0
+  m_Name: HorizonCloud
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &478057461
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 478057460}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_RootOrder: 8
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &654401883
 GameObject:
   m_ObjectHideFlags: 0
@@ -264,7 +294,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 9
+  m_RootOrder: 10
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &681881932
 GameObject:
@@ -675,11 +705,11 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 967215095}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1.12, y: -0.25915265, z: 2.434331}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalPosition: {x: 1.12, y: 3000, z: -4000}
+  m_LocalScale: {x: 2000, y: 2000, z: 2000}
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 8
+  m_RootOrder: 9
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1005321168
 GameObject:
@@ -895,7 +925,7 @@ Camera:
     width: 1
     height: 1
   near clip plane: 0.3
-  far clip plane: 1000
+  far clip plane: 6000000
   field of view: 60
   orthographic: 0
   orthographic size: 5
@@ -921,13 +951,13 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1182117739}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -9436}
+  m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
+  m_LocalPosition: {x: 0, y: 637, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 0
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
 --- !u!114 &1182117744
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1029,8 +1059,9 @@ GameObject:
   - component: {fileID: 1361336275}
   - component: {fileID: 1361336276}
   - component: {fileID: 1361336272}
-  - component: {fileID: 1361336273}
   - component: {fileID: 1361336274}
+  - component: {fileID: 1361336273}
+  - component: {fileID: 1361336277}
   m_Layer: 0
   m_Name: CloudRenderer
   m_TagString: Untagged
@@ -1050,41 +1081,46 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6f3a89901024a364bbbc791089d5a66d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  mShaderIndex: 3
+  mShaderIndex: 5
   mShaders:
   - {fileID: 4800000, guid: d8b610382de4a02489774d831873d14f, type: 3}
   - {fileID: 4800000, guid: b83fb0e454b1f964286f8c586f255c24, type: 3}
   - {fileID: 4800000, guid: 8357094c01d7cba4db44b1d1725f6b5f, type: 3}
   - {fileID: 4800000, guid: 95beb750ccdf6614297881375fd02bdb, type: 3}
   - {fileID: 4800000, guid: c9eb9e8463c8db84fbbf27acc21f236f, type: 3}
-  mPlanetCloud: {fileID: 1361336273}
+  - {fileID: 4800000, guid: 66c319f8d1f03104593283121b69c04c, type: 3}
   mBoxCloud: {fileID: 1361336274}
-  drawArea: 0
+  mPlanetCloud: {fileID: 1361336273}
+  mHorizonLineCloud: {fileID: 1361336277}
+  mDrawArea: 1
   mWorleyNoise: {fileID: 1975134050}
   mDetailNoise: {fileID: 1975134052}
   mShader: {fileID: 4800000, guid: d8b610382de4a02489774d831873d14f, type: 3}
   mWeatherTexture2D: {fileID: 2800000, guid: ef7a2acc27d031e4ba6390e8565f4b85, type: 3}
-  mStepThickness: 100
-  mShapeDensityStrength: 1
-  mDensityThreshold: 0.48
-  mShapeScale: 0.01
-  mDetailDensityStrength: 0
+  mStepCount: 100
+  mShapeStepLength: 20
+  mShapeScale: 0.005
+  mShapeDensityStrength: 0.82
+  mDetailScale: 0.08
+  mDetailDensityStrength: 0.01
+  mDensityThreshold: 0.14
   mEdgeLength: 100
   mCoverageRate: 1
+  mLightStepLength: 20
   mCloudColorLight: {r: 1, g: 1, b: 1, a: 1}
   mCloudColorBlack: {r: 0, g: 0, b: 0, a: 1}
   mDarknessThreshold: 0.1
   mCloudAbsorption: 1
-  mLightAbsorption: 1.27
-  mBrightness: 2.47
-  mForwardScatteringScale: 0
+  mLightAbsorption: 1.3
+  mBrightness: 1
+  mForwardScattering: 0
   mEneryParams: {x: -0.72, y: 0.72, z: 87.37, w: 0.64}
-  mCloudOffset: {x: 69.97931, y: 66.56456, z: 67.903404}
-  mCloudSpeed: {x: 0.05, y: 0, z: 0.05}
+  mCloudOffset: {x: 0, y: 0, z: 0}
+  mCloudSpeed: {x: 0.0008, y: 0, z: 0}
   mShapeSpeedScale: {x: 0, y: 0, z: 0}
   mDetailSpeedScale: {x: 0, y: 0, z: 0}
   mBlueNoise: {fileID: 2800000, guid: 74b510599ad2c73458d30bec8f14998b, type: 3}
-  mBlueNoiseIntensity: 20
+  mBlueNoiseIntensity: 0
   mEnableBilateralBlur: 0
   mBlurShader: {fileID: 4800000, guid: d049b6787b291e14fb15d50516b39c1f, type: 3}
   mBlurParams: {x: 9, y: 9, z: 2}
@@ -1142,12 +1178,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 922ecff8c7f80084ca29cbeb3c94eab3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  mPlanetCloud: {fileID: 1361336273}
   mBoxCloud: {fileID: 1361336274}
+  mPlanetCloud: {fileID: 1361336273}
+  mHorizonLineCloud: {fileID: 1361336277}
   mRenderer: {fileID: 1361336272}
   mLight: {fileID: 1991451969}
   mCamera: {fileID: 1182117741}
-  mDrawGizmos: 1
+  mDrawGizmos: 0
   mDectetRayMode: 0
   mStepSize: 5000
   mStepCount: 4
@@ -1156,6 +1193,21 @@ MonoBehaviour:
   mDrawCameraRay: 0
   mDrawDetectRay: 0
   mDrawLight: 0
+--- !u!114 &1361336277
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1361336271}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a5505b28ef7f93941aedf00631e9aeb8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  markObject: {fileID: 478057461}
+  planetRadius: 6000000
+  cloudThickness: {x: 1500, y: 4000}
 --- !u!1 &1553553320
 GameObject:
   m_ObjectHideFlags: 0
@@ -1270,14 +1322,15 @@ MonoBehaviour:
   mGridCountArray: 04000000080000001000000020000000
   mFlipWorleyNoise: 1
   mOctave: 7
-  mFrequency: 4
-  mLacunarity: 4
+  mFrequency: 2
+  mLacunarity: 2
   mPersistence: 0.5
   mOffset: {x: 0, y: 0, z: 0}
   mMoveSpeed: {x: 0, y: 0, z: 0}
   mRenderers:
   - {fileID: 1553553321}
   mComputeShader: {fileID: 7200000, guid: 6b3ef6480cc326140a95a8684cccf7d8, type: 3}
+  mDetailNoise: {fileID: 1975134052}
   mPerlinNosieRenderer: {fileID: 687189304}
 --- !u!4 &1975134051
 Transform:

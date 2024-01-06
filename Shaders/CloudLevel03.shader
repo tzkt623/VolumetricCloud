@@ -33,20 +33,27 @@
 				float3 viewDir : TEXCOORD1;
 			};
 
-			float calculateDensity(in float3 pos)
+			float calculateDensity(in float3 pos, in float height)
 			{
 				float edge;
-				if (_DrawPlanetArea)
+				float height_rate = 0;
+				float4 noise;
+				if (_DrawAreaIndex == AREA_BOX)
 				{
-					edge = calculateEdgeForPlanet(pos, _PlanetCloudThickness.y, _PlanetData.xyz, _PlanetData.w);
+					edge = calculateEdgeForBox(pos, _BoxMin, _BoxMax);
+					noise = _ShapeTex3D.SampleLevel(sampler_ShapeTex3D, pos * SHAPE_SCALE + _CloudOffset, 0);
+
+
 				}
 				else
 				{
-					edge = calculateEdgeForBox(pos, _BoxMin, _BoxMax);
+					edge = calculateEdgeForSphereArea(height);
+
+					//float3 off = float3(sin(_CloudOffset.z), sin(_CloudOffset.x), sin(_CloudOffset.y));
+					noise = _ShapeTex3D.SampleLevel(sampler_ShapeTex3D, pos * SHAPE_SCALE + _CloudOffset, 0);
 				}
 
 
-				float4 noise = _ShapeTex3D.SampleLevel(sampler_ShapeTex3D, pos * _ShapeScale * 0.01f + _CloudOffset, 0);
 				float fbm = dot(noise.gba, float3(0.625, 0.25, 0.125));
 				float shape = remap(noise.r, fbm - 1, 1.0, 0.0, 1.0);
 
@@ -61,17 +68,7 @@
 				float dst_to_begin_pos;
 				float cloud_thickness;
 
-				if (_DrawPlanetArea)
-				{
-					if (!calculatePlanetCloudData(_ViewPosition, _PlanetData, _PlanetCloudThickness, rayOrg, rayDir, cloud_area_data))
-					{
-						return float3(0.0f, 1.0f, 1.0f);
-					}
-
-					dst_to_begin_pos = cloud_area_data.x;
-					cloud_thickness = cloud_area_data.y;
-				}
-				else
+				if (_DrawAreaIndex == AREA_BOX)
 				{
 					cloud_area_data = rayBoxDst(_BoxMin, _BoxMax, rayOrg, rayDir);
 					cloud_thickness = cloud_area_data.y;
@@ -83,6 +80,16 @@
 
 					dst_to_begin_pos = cloud_area_data.x;
 				}
+				else
+				{
+					if (!calculatePlanetCloudData(_ViewPosition, _PlanetData, _PlanetCloudThickness, rayOrg, rayDir, cloud_area_data))
+					{
+						return float3(0.0f, 1.0f, 1.0f);
+					}
+
+					dst_to_begin_pos = cloud_area_data.x;
+					cloud_thickness = cloud_area_data.y;
+				}
 
 				float transmittance = 0.68;
 				float final_light = 0;
@@ -93,7 +100,7 @@
 					random_offset = _BlueNoiseTex2D.SampleLevel(sampler_BlueNoiseTex2D, squareUV(uv * 3), 0) * _BlueNoiseIntensity;
 				}
 
-				float step_thickness = cloud_thickness / _StepThickness;
+				float step_thickness = cloud_thickness / _StepCount;
 
 				float3 step_dir_length = rayDir * step_thickness;
 				float total_thickness = random_offset + step_thickness;
@@ -112,24 +119,26 @@
 						break;
 					}
 
-					float density = calculateDensity(begin_pos);
+					float height_rate = calculateHeightRate(begin_pos);
+					float density = calculateDensity(begin_pos, height_rate);
 					if (density > 0.0f)
 					{
-						total_density += density * step_thickness;
+						total_density += density;
 
 						float light_total_density = 0;
 						float3 light_pos = begin_pos;
 						for (int i = 0; i < 6; i++)
 						{
 							light_pos += lightDir * step_thickness;
-							float light_density = calculateDensity(light_pos);
-							light_total_density += max(0.0, light_density * step_thickness);
+							height_rate = calculateHeightRate(light_pos);
+							float light_density = calculateDensity(light_pos, height_rate);
+							light_total_density += max(0.0, light_density);
 						}
 
 						float light_transmission = bear(light_total_density * _LightAbsorption);
 						float shadow = _DarknessThreshold + light_transmission * (1.0 - _DarknessThreshold);
-						final_light += density * step_thickness * transmittance * shadow;
-						transmittance *= bear(density * step_thickness * _CloudAbsorption);
+						final_light += total_density * transmittance * shadow;
+						transmittance *= bear(total_density * _CloudAbsorption);
 					}
 
 					if (transmittance <= 0.1)

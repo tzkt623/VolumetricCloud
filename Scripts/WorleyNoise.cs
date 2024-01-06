@@ -17,7 +17,10 @@ namespace tezcat.Framework.Exp
             C2,
             C3,
             C123,
-            C123FBM
+            C123FBM,
+            Shape,
+            ShapeWithFBM,
+            ShapeWithDetail
         }
         public bool mUpdate = false;
         public Channel mChannel = Channel.C0;

@@ -55,7 +55,7 @@
 				float base_shape = calculateBaseShape(uvw, lod);
 
 				float time = _Time.x;
-				float cloud_type = getCloudDatas(height);
+				float cloud_type = getCloudDatas(height, height);
 
 				float edge_x_rate = 1;
 				float edge_z_rate = 1;
@@ -103,7 +103,16 @@
 				float dst_to_begin_pos;
 				float cloud_thickness;
 
-				if (_DrawPlanetArea)
+				if (_DrawAreaIndex == AREA_BOX)
+				{
+					cloud_area_data = rayBoxDst(_BoxMin, _BoxMax, pos, lightDir);
+					cloud_thickness = cloud_area_data.y;
+					if (cloud_thickness <= 0)
+					{
+						return 0;
+					}
+				}
+				else
 				{
 					if (!calculatePlanetCloudData(_ViewPosition, _PlanetData, _PlanetCloudThickness, pos, lightDir, cloud_area_data))
 					{
@@ -112,15 +121,6 @@
 
 					dst_to_begin_pos = cloud_area_data.x;
 					cloud_thickness = cloud_area_data.y;
-				}
-				else
-				{
-					cloud_area_data = rayBoxDst(_BoxMin, _BoxMax, pos, lightDir);
-					cloud_thickness = cloud_area_data.y;
-					if (cloud_thickness <= 0)
-					{
-						return 0;
-					}
 				}
 
 
@@ -196,17 +196,7 @@
 				float dst_to_begin_pos;
 				float cloud_thickness;
 
-				if (_DrawPlanetArea)
-				{
-					if (!calculatePlanetCloudData(_ViewPosition, _PlanetData, _PlanetCloudThickness, rayOrg, rayDir, cloud_area_data))
-					{
-						return float4(0.0f, 0.0f, 0.0f, 1.0f);
-					}
-
-					dst_to_begin_pos = cloud_area_data.x;
-					cloud_thickness = cloud_area_data.y;
-				}
-				else
+				if (_DrawAreaIndex == AREA_BOX)
 				{
 					cloud_area_data = rayBoxDst(_BoxMin, _BoxMax, rayOrg, rayDir);
 					dst_to_begin_pos = cloud_area_data.x;
@@ -217,6 +207,16 @@
 					}
 
 					float max_length = length(_BoxMax - _BoxMin);
+				}
+				else
+				{
+					if (!calculatePlanetCloudData(_ViewPosition, _PlanetData, _PlanetCloudThickness, rayOrg, rayDir, cloud_area_data))
+					{
+						return float4(0.0f, 0.0f, 0.0f, 1.0f);
+					}
+
+					dst_to_begin_pos = cloud_area_data.x;
+					cloud_thickness = cloud_area_data.y;
 				}
 
 				float transmittance = 1;
@@ -232,7 +232,7 @@
 				}
 
 
-				float step_thickness = cloud_thickness / _StepThickness;
+				float step_thickness = cloud_thickness / _StepCount;
 				float total_thickness = random_offset + step_thickness;
 
 				float3 begin_pos = rayOrg + rayDir * (dst_to_begin_pos + random_offset);
@@ -271,6 +271,7 @@
 								* _CloudColorBlack.rgb;
 							transmittance *= bearNew(step_thickness * step_density * _CloudAbsorption);
 							begin_pos += step_dir_length;
+							total_thickness += step_thickness;
 
 							//light_total_energy = float3(1.0, 0.0, 0.0);
 

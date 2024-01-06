@@ -33,28 +33,39 @@
 				float3 viewDir : TEXCOORD1;
 			};
 
-			float calculateDensity(in float3 pos)
+			float calculateDensity(in float3 pos, in float heightRate)
 			{
-				float edge;
+				float edge = 1;
+				float height_rate = 0;
 				float weather = 1;
-				if (_DrawPlanetArea)
+
+				if (_DrawAreaIndex == AREA_BOX)
 				{
-					edge = calculateEdgeForPlanet(pos, _PlanetCloudThickness.y, _PlanetData.xyz, _PlanetData.w);
-					
-					float3 pos_dir = normalize(pos - _PlanetData.xyz);
-					float3 bottom = normalize(float3(0, -_PlanetData.w, 0));
-					float3 back = normalize(float3(-_PlanetData.w, 0, 0));
-					float2 uv = float2(dot(pos_dir, bottom) * 0.5 + 0.5, 1 - dot(pos_dir, back) * 0.5 + 0.5);
-					weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, uv, 0).r;
+					edge = calculateEdgeForBox(pos, _BoxMin, _BoxMax);
+					//weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, (pos.xz - _BoxMin.xz) / (_BoxMax.xz - _BoxMin.xz), 0).r;
 				}
 				else
 				{
-					edge = calculateEdgeForBox(pos, _BoxMin, _BoxMax);
-					weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, (pos.xz - _BoxMin.xz) / (_BoxMax.xz - _BoxMin.xz), 0).r;
+					edge = calculateEdgeForSphereArea(height_rate);
+
+
+					if (_DrawAreaIndex == AREA_HORIZON_LINE)
+					{
+						//weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, pos.xy, 0).r;
+					}
+					else
+					{
+						float3 pos_dir = normalize(pos - _PlanetData.xyz);
+						float3 bottom = float3(0, -1, 0);
+						float3 back = float3(-1, 0, 0);
+						float2 uv = float2(1 - dot(pos_dir, bottom) * 0.5 + 0.5, dot(pos_dir, back) * 0.5 + 0.5);
+
+						weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, uv + _Time.x * 0.1, 0).r;
+					}
 				}
 
 
-				float4 noise = _ShapeTex3D.SampleLevel(sampler_ShapeTex3D, pos * _ShapeScale * 0.01f + _CloudOffset, 0);
+				float4 noise = _ShapeTex3D.SampleLevel(sampler_ShapeTex3D, pos * SHAPE_SCALE + _CloudOffset, 0);
 				float fbm = dot(noise.gba, float3(0.625, 0.25, 0.125));
 				float shape = remap(noise.r, fbm - 1, 1.0, 0.0, 1.0);
 
@@ -82,8 +93,25 @@
 				float dst_to_begin_pos;
 				float cloud_thickness;
 
-				if (_DrawPlanetArea)
+				if (_DrawAreaIndex == AREA_BOX)
 				{
+					cloud_area_data = rayBoxDst(_BoxMin, _BoxMax, rayOrg, rayDir);
+					dst_to_begin_pos = cloud_area_data.x;
+					cloud_thickness = cloud_area_data.y;
+				}
+				else
+				{
+					if (_DrawAreaIndex == AREA_HORIZON_LINE)
+					{
+						if (_ViewPosition == CAM_UNDER_CLOUD)
+						{
+							if (dot(float3(0.0, 1.0, 0.0), rayDir) < 0.0f)
+							{
+								return float3(0.0f, 1.0f, 1.0f);
+							}
+						}
+					}
+
 					if (!calculatePlanetCloudData(_ViewPosition, _PlanetData, _PlanetCloudThickness, rayOrg, rayDir, cloud_area_data))
 					{
 						return float3(0.0f, 1.0f, 1.0f);
@@ -92,21 +120,11 @@
 					dst_to_begin_pos = cloud_area_data.x;
 					cloud_thickness = cloud_area_data.y;
 				}
-				else
+
+				if (cloud_thickness <= 0)
 				{
-					cloud_area_data = rayBoxDst(_BoxMin, _BoxMax, rayOrg, rayDir);
-					cloud_thickness = cloud_area_data.y;
-
-					if (cloud_thickness <= 0)
-					{
-						return float3(0.0f, 1.0f, 1.0f);
-					}
-
-					dst_to_begin_pos = cloud_area_data.x;
+					return float3(0.0f, 1.0f, 1.0f);
 				}
-
-				float transmittance = 0.68;
-				float final_light = 0;
 
 				float random_offset = 0;
 				if (_BlueNoiseIntensity > 0)
@@ -114,26 +132,29 @@
 					random_offset = _BlueNoiseTex2D.SampleLevel(sampler_BlueNoiseTex2D, squareUV(uv * 3), 0) * _BlueNoiseIntensity;
 				}
 
-				float step_thickness = cloud_thickness / _StepThickness;
+				float step_thickness = cloud_thickness / (float)_StepCount;
 
 				float3 step_dir_length = rayDir * step_thickness;
-				float total_thickness = random_offset + step_thickness;
-				float total_density = 0;
+				float total_thickness = random_offset;
 
-				float3 begin_pos = rayOrg + rayDir * (dst_to_begin_pos + random_offset);
-				begin_pos += step_dir_length;
+				float3 begin_pos = rayOrg + rayDir * (dst_to_begin_pos +random_offset);
+
+				float total_density = 0;
+				float transmittance = 1.0;
+				float final_light = 0;
 
 				float cos_angle = dot(rayDir, lightDir);
 				float phase = phaseFunc(cos_angle, _EnergyParams);
 
-				while (total_thickness <= cloud_thickness)
+				while (total_thickness < cloud_thickness)
 				{
 					if (total_thickness + dst_to_begin_pos > depth)
 					{
 						break;
 					}
-
-					float density = calculateDensity(begin_pos);
+					
+					float height_rate = calculateHeightRate(begin_pos);
+					float density = calculateDensity(begin_pos, height_rate);
 					if (density > 0.0f)
 					{
 						total_density += density * step_thickness;
@@ -143,14 +164,16 @@
 						for (int i = 0; i < 6; i++)
 						{
 							light_pos += lightDir * step_thickness;
-							float light_density = calculateDensity(light_pos);
+							height_rate = calculateHeightRate(light_pos);
+							float light_density = calculateDensity(light_pos, height_rate);
 							light_total_density += max(0.0, light_density * step_thickness);
 						}
 
 						float light_transmission = bearNew(light_total_density * _LightAbsorption);
 						float shadow = _DarknessThreshold + light_transmission * (1.0 - _DarknessThreshold);
 						final_light += density * step_thickness * transmittance * shadow;
-						transmittance *= bearNew(density * step_thickness * _CloudAbsorption);
+						
+						transmittance *= bear(density * step_thickness * _CloudAbsorption);
 					}
 
 					if (transmittance <= 0.1)

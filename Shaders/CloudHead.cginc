@@ -7,6 +7,7 @@
 //
 sampler2D _ScreenTex;
 sampler2D _CameraDepthTexture;
+float3 _CameraUp;
 
 //----------------------------
 //
@@ -28,13 +29,22 @@ SamplerState sampler_BlueNoiseTex2D;
 //
 // Shape
 //
-float _StepThickness;
+float _StepCount;
+float _ShapeStepLength;
 float _ShapeScale;
+float _DetailScale;
 float _ShapeDensityStrength;
 float _DetailDensityStrength;
 float _DensityThreshold;
 float _EdgeLength;
 float _CoverageRate;
+#define SHAPE_SCALE (_ShapeScale * 0.01f)
+#define DETAIL_SCALE (_DetailScale * 0.01f)
+static float3 FBM_FACTOR = float3(0.625, 0.25, 0.125);
+
+#define STRATUS_GRADIENT float4(0.0, 0.1, 0.2, 0.3)
+#define STRATOCUMULUS_GRADIENT float4(0.02, 0.2, 0.48, 0.625)
+#define CUMULUS_GRADIENT float4(0.00, 0.1625, 0.88, 0.98)
 
 //-----------------------
 //
@@ -43,11 +53,13 @@ float _CoverageRate;
 float3 _ShapeSpeedScale;
 float3 _DetailSpeedScale;
 float3 _CloudOffset;
+float3 _CloudSpeed;
 
 //----------------------------
 //
 // Light
 //
+float _LightStepLength;
 float4 _CloudColorLight;
 float4 _CloudColorBlack;
 float _CloudAbsorption;
@@ -68,7 +80,16 @@ float _BlueNoiseIntensity;
 //
 //	Area
 //
-bool _DrawPlanetArea;
+#define AREA_BOX 0
+#define AREA_PLANET 1
+#define AREA_HORIZON_LINE 2
+
+#define CAM_UNDER_HORIZON_LINE -1
+#define CAM_UNDER_CLOUD 0
+#define CAM_IN_CLOUD 1
+#define CAM_OUT_CLOUD 2
+
+int _DrawAreaIndex;
 float3 _BoxMin;
 float3 _BoxMax;
 //-1在地表里
@@ -80,9 +101,10 @@ float4 _PlanetData;
 float2 _PlanetCloudThickness;
 
 
+
 //---------------------------------
 //
-//
+// Ray Generator
 //
 float3 calculateViewDir(in float2 uv)
 {
@@ -96,18 +118,18 @@ void calulateRayMarchDatas(in float2 uv, in float3 viewDir
 	, out float3 rayO, out float3 rayDir, out float3 lightDir, out float depth)
 {
 	rayO = _WorldSpaceCameraPos;
-	rayDir = normalize(viewDir);
+	float ray_length = length(viewDir);
+	rayDir = viewDir / ray_length;
 	//_WorldSpaceLightPos0.xyz是指向光源的方向
 	lightDir = normalize(_WorldSpaceLightPos0.xyz);
 
 	float depth_in_buffer = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv).r;
-	depth = LinearEyeDepth(depth_in_buffer);// *length(i.viewDir);
+	depth = LinearEyeDepth(depth_in_buffer) * ray_length;
 }
 
 //--------------------------------------------------------------------
 //
 //	Function
-//
 //
 float2 squareUV(float2 uv)
 {
@@ -156,11 +178,16 @@ bool calculatePlanetCloudData(in int viewPosition
 	, in float3 pos, in float3 rayDir
 	, out float2 cloudData)
 {
+	if (viewPosition == CAM_UNDER_HORIZON_LINE)
+	{
+		return false;
+	}
+
 	float2 cloud_min = raySphereDst(sphereData.xyz, sphereData.w + cloudThicknessMinMax.x, pos, rayDir);
 	float2 cloud_max = raySphereDst(sphereData.xyz, sphereData.w + cloudThicknessMinMax.y, pos, rayDir);
 
 	//地表上
-	if (viewPosition == 0)
+	if (viewPosition == CAM_UNDER_CLOUD)
 	{
 		//beginPos = pos + rayDir * cloud_min.y;
 
@@ -170,7 +197,7 @@ bool calculatePlanetCloudData(in int viewPosition
 		return true;
 	}
 	//在云层中
-	else if (viewPosition == 1)
+	else if (viewPosition == CAM_IN_CLOUD)
 	{
 		//beginPos = pos;
 
@@ -180,7 +207,7 @@ bool calculatePlanetCloudData(in int viewPosition
 		return true;
 	}
 	//在云层外
-	else if (viewPosition == 2)
+	else if (viewPosition == CAM_OUT_CLOUD)
 	{
 		if (cloud_max.y > 0)
 		{
@@ -209,8 +236,6 @@ bool isOutOfBox(in float3 pos, in float3 boxMin, in float3 boxMax)
 //
 // Cloud Lighting
 //
-
-//cosAngle = dot(lightDir, viewDir)
 float hgFunc(in float g, in float cosAngle)
 {
 	float g2 = g * g;
@@ -244,7 +269,7 @@ float phasePBRBook(in float cosAngle, in float4 energyParams)
 
 float phaseFunc(in float cosAngle, in float4 energyParams)
 {
-	return phaseHZ(cosAngle, energyParams);
+	return phaseO(cosAngle, energyParams);
 }
 
 float powderEffect(in float value)
@@ -255,10 +280,10 @@ float powderEffect(in float value)
 //HZ Funcion
 float bearPowder(float value)
 {
-	//float bear_law = exp(-value);
-	float bear_law = max(exp(-value), exp(-value * 0.25) * 0.7);
+	float bear_law = exp(-value);
+	//float bear_law = max(exp(-value), exp(-value * 0.25) * 0.7);
 	float powder_sugar_effect = 1.0f - exp(-value * 2.0f);
-	return bear_law * powder_sugar_effect * 1.8f;
+	return bear_law * powder_sugar_effect * 2.0f;
 }
 
 float bear(float value)
@@ -294,6 +319,16 @@ float calulateLightEnergy(in float density, in float phaseValue, in float lightA
 	return darknessThreshold + energy * (1 - darknessThreshold);
 }
 
+float calculateInScatter(in float heightRate, in float density)
+{
+	float depth_probability = 0.05 + pow(density, remapPositive(heightRate, 0.3, 0.85, 0.5, 2.0));
+	float vertical_probability = pow(remapPositive(heightRate, 0.07, 0.14, 0.1, 1.0), 0.8);
+	float in_scatter_probability = depth_probability * vertical_probability;
+
+	return in_scatter_probability;
+
+}
+
 //----------------------------------------------------
 //
 // Cloud Shape
@@ -310,6 +345,17 @@ float getHeightFractionForPoint(float length, float2 inCloudMinMax)
 	return saturate(height_fraction);
 }
 
+float calculateHeightRateForSphereArea(in float3 pos, in float4 planetData, in float2 cloudThickness)
+{
+	float height = length(pos - planetData.xyz) - planetData.w - cloudThickness.x;
+	return height / (cloudThickness.y - cloudThickness.x);
+}
+
+float calculateHeightRateForBoxArea(in float3 pos, in float3 boxMin, in float3 boxMax)
+{
+	return (pos.y - boxMin.y) / (boxMax.y - boxMin.y);
+}
+
 float calculateEdgeForBox(in float3 pos, in float3 boxMin, in float3 boxMax)
 {
 	float2 length_xz = min(pos.xz - boxMin.xz, boxMax.xz - pos.xz);
@@ -322,24 +368,36 @@ float calculateEdgeForBox(in float3 pos, in float3 boxMin, in float3 boxMax)
 	return length_xz.x * length_y * length_xz.y;
 }
 
-float calculateEdgeForPlanet(in float3 pos, in float3 outerRadius, in float3 planetCenter, in float planetRadius)
+float calculateEdgeForSphereArea(in float heightRate)
 {
-	float height = length(pos - planetCenter);
-	float rate = height / (planetRadius + outerRadius);
-
-	return remapPositive(rate, 0.8, 1.0, 1.0, 0.0);
+	return remapPositive(heightRate, 0.8, 1.0, 1.0, 0.0);
 }
 
-float getCloudDatas(float height)
+float getCloudDatas(in float heightRate, in float cloudType)
 {
-	float stratus = max(0.0, remap(height, 0.0, 0.1, 0.0, 1.0) * remap(height, 0.2, 0.3, 1.0, 0.0));
-	float stratocumulus = max(0.0, remap(height, 0.0, 0.25, 0.0, 1.0) * remap(height, 0.3, 0.65, 1.0, 0.0));
-	float cumulus = max(0.0, remap(height, 0.01, 0.3, 0.0, 1.0) * remap(height, 0.6, 0.95, 1.0, 0.0));
+	float stratus = max(0.0, remap(heightRate, 0.0, 0.1, 0.0, 1.0) * remap(heightRate, 0.2, 0.3, 1.0, 0.0));
+	float stratocumulus = max(0.0, remap(heightRate, 0.0, 0.25, 0.0, 1.0) * remap(heightRate, 0.3, 0.65, 1.0, 0.0));
+	float cumulus = max(0.0, remap(heightRate, 0.01, 0.3, 0.0, 1.0) * remap(heightRate, 0.6, 0.95, 1.0, 0.0));
 
-	float a = lerp(stratus, stratocumulus, clamp(height * 2.0, 0.0, 1.0));
-	float b = lerp(stratocumulus, cumulus, clamp((height - 0.5) * 2.0, 0.0, 1.0));
+	float a = lerp(stratus, stratocumulus, clamp(cloudType * 2.0, 0.0, 1.0));
+	float b = lerp(stratocumulus, cumulus, clamp((cloudType - 0.5) * 2.0, 0.0, 1.0));
 
-	return lerp(a, b, height);
+	return lerp(a, b, cloudType);
+}
+
+float calculateHeightRate(in float3 pos)
+{
+	float result;
+	if (_DrawAreaIndex == AREA_BOX)
+	{
+		result = calculateHeightRateForBoxArea(pos, _BoxMin, _BoxMax);
+	}
+	else
+	{
+		result = calculateHeightRateForSphereArea(pos, _PlanetData, _PlanetCloudThickness);
+	}
+
+	return result;
 }
 //----------------------------------------------------
 //
