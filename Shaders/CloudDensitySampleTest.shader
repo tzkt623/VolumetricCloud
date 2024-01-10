@@ -1,4 +1,4 @@
-﻿Shader "Tezcat/CloudLevel01"
+﻿Shader "Tezcat/CloudDensitySampleTest"
 {
 	Properties
 	{
@@ -17,8 +17,8 @@
 
 			#include "UnityCG.cginc"
 			#include "UnityLightingCommon.cginc"
-			#include "Function.cginc"
-			#include "CloudHead.cginc"
+			#include "Head/Function.cginc"
+			#include "Head/CloudHead.cginc"
 
 			struct appdata
 			{
@@ -36,37 +36,19 @@
 			//return xyz=LightEnergy w=Transmittance
 			float calculateFinalColor(in float3 rayOrg, in float3 rayDir, in float3 lightDir, in float depth, in float2 uv)
 			{
-				//x距离起点的距离,y内部长度
-				float2 cloud_area_data;
 				float dst_to_begin_pos;
 				float cloud_thickness;
 
-				if (_DrawAreaIndex == AREA_BOX)
+				if (!calculateCloudThickness(rayOrg, rayDir, dst_to_begin_pos, cloud_thickness))
 				{
-					cloud_area_data = rayBoxDst(_BoxMin, _BoxMax, rayOrg, rayDir);
-					dst_to_begin_pos = cloud_area_data.x;
-					cloud_thickness = cloud_area_data.y;
-					if (cloud_thickness <= 0)
-					{
-						return float4(0.0f, 0.0f, 0.0f, 1.0f);
-					}
-				}
-				else
-				{
-					if (!calculatePlanetCloudData(_ViewPosition, _PlanetData, _PlanetCloudThickness, rayOrg, rayDir, cloud_area_data))
-					{
-						return float4(0.0f, 0.0f, 0.0f, 1.0f);
-					}
-
-					dst_to_begin_pos = cloud_area_data.x;
-					cloud_thickness = cloud_area_data.y;
+					return 0.0f;
 				}
 
 				float transmittance = 1;
 				float light_total_energy = 0;
 
 				float random_offset = 0;
-				if (_BlueNoiseIntensity > 1)
+				if (_BlueNoiseIntensity > 0)
 				{
 					random_offset = _BlueNoiseTex2D.SampleLevel(sampler_BlueNoiseTex2D, squareUV(uv * 3), 0) * _BlueNoiseIntensity;
 				}
@@ -78,6 +60,7 @@
 				float3 step_dir_length = rayDir * step_thickness;
 
 				float total_density = 0;
+				float test_density = 0;
 
 				while (total_thickness <= cloud_thickness)
 				{
@@ -86,12 +69,13 @@
 						break;
 					}
 
-					total_density += 0.01f;
+					total_density += _ShapeTex3D.SampleLevel(sampler_ShapeTex3D, begin_pos + _CloudOffset, 0).r;
 					if (total_density >= 1)
 					{
 						break;
 					}
 					
+					begin_pos += step_dir_length;
 					total_thickness += step_thickness;
 				}
 

@@ -1,4 +1,4 @@
-﻿Shader "Tezcat/CloudLevel04"
+﻿Shader "Tezcat/CloudBaseLightWithIntegral"
 {
 	Properties
 	{
@@ -17,8 +17,8 @@
 
 			#include "UnityCG.cginc"
 			#include "UnityLightingCommon.cginc"
-			#include "Function.cginc"
-			#include "CloudHead.cginc"
+			#include "Head/Function.cginc"
+			#include "Head/CloudHead.cginc"
 
 			struct appdata
 			{
@@ -89,39 +89,10 @@
 			float3 calculateFinalColor(in float3 rayOrg, in float3 rayDir, in float3 lightDir, in float depth, in float2 uv)
 			{
 				//x距离起点的距离,y内部长度
-				float2 cloud_area_data;
 				float dst_to_begin_pos;
 				float cloud_thickness;
 
-				if (_DrawAreaIndex == AREA_BOX)
-				{
-					cloud_area_data = rayBoxDst(_BoxMin, _BoxMax, rayOrg, rayDir);
-					dst_to_begin_pos = cloud_area_data.x;
-					cloud_thickness = cloud_area_data.y;
-				}
-				else
-				{
-					if (_DrawAreaIndex == AREA_HORIZON_LINE)
-					{
-						if (_ViewPosition == CAM_UNDER_CLOUD)
-						{
-							if (dot(float3(0.0, 1.0, 0.0), rayDir) < 0.0f)
-							{
-								return float3(0.0f, 1.0f, 1.0f);
-							}
-						}
-					}
-
-					if (!calculatePlanetCloudData(_ViewPosition, _PlanetData, _PlanetCloudThickness, rayOrg, rayDir, cloud_area_data))
-					{
-						return float3(0.0f, 1.0f, 1.0f);
-					}
-
-					dst_to_begin_pos = cloud_area_data.x;
-					cloud_thickness = cloud_area_data.y;
-				}
-
-				if (cloud_thickness <= 0)
+				if (!calculateCloudThickness(rayOrg, rayDir, dst_to_begin_pos, cloud_thickness))
 				{
 					return float3(0.0f, 1.0f, 1.0f);
 				}

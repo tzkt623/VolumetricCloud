@@ -37,14 +37,24 @@ float _ShapeDensityStrength;
 float _DetailDensityStrength;
 float _DensityThreshold;
 float _EdgeLength;
-float _CoverageRate;
-#define SHAPE_SCALE (_ShapeScale * 0.01f)
-#define DETAIL_SCALE (_DetailScale * 0.01f)
+#define SHAPE_SCALE (_ShapeScale)
+#define DETAIL_SCALE (_DetailScale)
+#define SHAPE_DENSITY_SCALE (_ShapeDensityStrength )
+#define DETAIL_DENSITY_SCALE (_DetailDensityStrength )
+
 static float3 FBM_FACTOR = float3(0.625, 0.25, 0.125);
 
 #define STRATUS_GRADIENT float4(0.0, 0.1, 0.2, 0.3)
 #define STRATOCUMULUS_GRADIENT float4(0.02, 0.2, 0.48, 0.625)
 #define CUMULUS_GRADIENT float4(0.00, 0.1625, 0.88, 0.98)
+
+//----------------------------
+//
+// Weather
+//
+float2 _WeatherOffset;
+float _CoverageRate;
+float _AnvilRate;
 
 //-----------------------
 //
@@ -84,7 +94,7 @@ float _BlueNoiseIntensity;
 #define AREA_PLANET 1
 #define AREA_HORIZON_LINE 2
 
-#define CAM_UNDER_HORIZON_LINE -1
+#define CAM_UNDER_GROUND -1
 #define CAM_UNDER_CLOUD 0
 #define CAM_IN_CLOUD 1
 #define CAM_OUT_CLOUD 2
@@ -178,7 +188,7 @@ bool calculatePlanetCloudData(in int viewPosition
 	, in float3 pos, in float3 rayDir
 	, out float2 cloudData)
 {
-	if (viewPosition == CAM_UNDER_HORIZON_LINE)
+	if (viewPosition == CAM_UNDER_GROUND)
 	{
 		return false;
 	}
@@ -264,12 +274,19 @@ float phasePBRBook(in float cosAngle, in float4 energyParams)
 {
 	float v1 = hgFunc(energyParams.x, cosAngle);
 	float v2 = hgFunc(energyParams.y, cosAngle);
-	return mix(v1, v2, clamp(cosAngle * 0.5 + 0.5, 0.0, 1.0));
+	return lerp(v1, v2, energyParams.z);
+}
+
+float phase2(in float cosAngle, in float4 energyParams)
+{
+	float v1 = hgFunc(energyParams.x, cosAngle);
+	float v2 = hgFunc(energyParams.y, cosAngle);
+	return lerp(v1, v2, clamp(cosAngle * 0.5 + 0.5, 0.0, 1.0));
 }
 
 float phaseFunc(in float cosAngle, in float4 energyParams)
 {
-	return phaseO(cosAngle, energyParams);
+	return phasePBRBook(cosAngle, energyParams);
 }
 
 float powderEffect(in float value)
@@ -399,6 +416,75 @@ float calculateHeightRate(in float3 pos)
 
 	return result;
 }
+
+bool calculateCloudThickness(in float3 rayOrg, in float3 rayDir, out float dst_to_begin_pos, out float cloud_thickness)
+{
+	float2 cloud_area_data;
+
+	if (_DrawAreaIndex == AREA_BOX)
+	{
+		cloud_area_data = rayBoxDst(_BoxMin, _BoxMax, rayOrg, rayDir);
+		dst_to_begin_pos = cloud_area_data.x;
+		cloud_thickness = cloud_area_data.y;
+	}
+	else
+	{
+		if (_DrawAreaIndex == AREA_HORIZON_LINE)
+		{
+			if (_ViewPosition == CAM_UNDER_CLOUD)
+			{
+				if (dot(float3(0.0, 1.0, 0.0), rayDir) < 0.0f)
+				{
+					return false;
+				}
+			}
+		}
+
+		if (!calculatePlanetCloudData(_ViewPosition, _PlanetData, _PlanetCloudThickness, rayOrg, rayDir, cloud_area_data))
+		{
+			return false;
+		}
+
+		dst_to_begin_pos = cloud_area_data.x;
+		cloud_thickness = cloud_area_data.y;
+	}
+
+	if (cloud_thickness <= 0)
+	{
+		return false;
+	}
+
+	return true;
+}
+
+void calculateWeatherAndEdge(in float3 pos, in float heightRate, out float weather, out float edge)
+{
+	if (_DrawAreaIndex == AREA_BOX)
+	{
+		edge = calculateEdgeForBox(pos, _BoxMin, _BoxMax);
+		weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, (pos.xz - _BoxMin.xz) / (_BoxMax.xz - _BoxMin.xz), 0).r * _CoverageRate;
+	}
+	else
+	{
+		edge = calculateEdgeForSphereArea(heightRate);
+		float2 uv;
+		if (_DrawAreaIndex == AREA_HORIZON_LINE)
+		{
+			uv = (pos.xz * 100 / (_PlanetData.w + _PlanetCloudThickness.x) + 0.5) + _WeatherOffset;
+			weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, uv, 0).r;
+		}
+		else
+		{
+			float3 pos_dir = normalize(pos - _PlanetData.xyz);
+			float3 bottom = float3(0, -1, 0);
+			float3 back = float3(-1, 0, 0);
+			uv = float2(dot(pos_dir, bottom) * 0.5 + 0.5, dot(pos_dir, back) * 0.5 + 0.5) + _WeatherOffset;
+
+			weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, uv, 0).r;
+		}
+	}
+}
+
 //----------------------------------------------------
 //
 // Debug

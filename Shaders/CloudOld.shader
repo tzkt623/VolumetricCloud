@@ -1,4 +1,4 @@
-﻿Shader "Tezcat/CloudBox"
+﻿Shader "Tezcat/CloudOld"
 {
 	Properties
 	{
@@ -17,8 +17,8 @@
 
 			#include "UnityCG.cginc"
 			#include "UnityLightingCommon.cginc"
-			#include "Function.cginc"
-			#include "CloudHead.cginc"
+			#include "Head/Function.cginc"
+			#include "Head/CloudHead.cginc"
 
 			struct appdata
 			{

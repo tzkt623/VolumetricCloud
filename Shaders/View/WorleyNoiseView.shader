@@ -3,6 +3,7 @@
 	Properties
 	{
 		_Mix("Mix", Float) = 0
+		_ShapeThreshold("ShapeThreshold", Float) = 1
 	}
 	SubShader
 	{
@@ -19,7 +20,7 @@
 			#pragma fragment frag
 
 			#include "UnityCG.cginc"
-			#include "Function.cginc"
+			#include "../Head/Function.cginc"
 
 			struct appdata
 			{
@@ -42,6 +43,7 @@
 			int _Dimension;
 			int _Channel;
 			float _Mix;
+			float _ShapeThreshold;
 
 			float4 _MainTex2D_ST;
 
@@ -93,17 +95,18 @@
 					case 7:
 					{
 						float worley_fbm = dot(noise.gba, float3(0.625, 0.25, 0.125));
-						col.rgb = remap(noise.r, worley_fbm - 1, 1.0, 0.0, 1.0);
+						col.rgb = max(0.0, remap(noise.r, worley_fbm - 1, 1.0, 0.0, 1.0) - _ShapeThreshold);
 						break;
 					}
 					case 8:
 					{
 						float worley_fbm = dot(noise.gba, float3(0.625, 0.25, 0.125));
 						float shape = remap(noise.r, worley_fbm - 1, 1.0, 0.0, 1.0);
+						shape = max(0.0, shape - _ShapeThreshold);
 
 						float4 detail = tex3Dlod(_DetailTex3D, float4(i.uv3, 0));
 						float detail_fbm = dot(detail.rgb, float3(0.625, 0.25, 0.125));
-						float modifier = mix(detail_fbm, 1 - detail_fbm, _Mix);
+						//float modifier = mix(detail_fbm, 1 - detail_fbm, _Mix);
 						col.rgb = remap(shape, (1 - detail_fbm) * i.uv3.y, 1.0, 0.0, 1.0);
 						//col.rgb = 1 - detail_fbm;
 						break;

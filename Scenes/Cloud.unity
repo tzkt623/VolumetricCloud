@@ -231,7 +231,7 @@ GameObject:
   - component: {fileID: 654401885}
   - component: {fileID: 654401884}
   m_Layer: 0
-  m_Name: Capsule
+  m_Name: LowMarkObject
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -290,7 +290,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 654401883}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.7827479, y: -0.25915265, z: 2.434331}
+  m_LocalPosition: {x: 0, y: 300, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -320,7 +320,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 681881932}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -231, y: 1583, z: -1385}
+  m_LocalPosition: {x: -231, y: 8000, z: -1385}
   m_LocalScale: {x: 20000, y: 4000, z: 20000}
   m_Children: []
   m_Father: {fileID: 0}
@@ -646,7 +646,7 @@ GameObject:
   - component: {fileID: 967215097}
   - component: {fileID: 967215096}
   m_Layer: 0
-  m_Name: Cylinder
+  m_Name: HugeMarkObject
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1081,8 +1081,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6f3a89901024a364bbbc791089d5a66d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  mShaderIndex: 5
-  mShaders:
+  mCurrnetIndex: 6
+  mSetIndex: 6
+  mShaderList:
+  - {fileID: 4800000, guid: 88cc8009f7e52864bb22cc761da83acd, type: 3}
   - {fileID: 4800000, guid: d8b610382de4a02489774d831873d14f, type: 3}
   - {fileID: 4800000, guid: b83fb0e454b1f964286f8c586f255c24, type: 3}
   - {fileID: 4800000, guid: 8357094c01d7cba4db44b1d1725f6b5f, type: 3}
@@ -1092,31 +1094,33 @@ MonoBehaviour:
   mBoxCloud: {fileID: 1361336274}
   mPlanetCloud: {fileID: 1361336273}
   mHorizonLineCloud: {fileID: 1361336277}
-  mDrawArea: 1
+  mDrawArea: 2
   mWorleyNoise: {fileID: 1975134050}
   mDetailNoise: {fileID: 1975134052}
-  mShader: {fileID: 4800000, guid: d8b610382de4a02489774d831873d14f, type: 3}
-  mWeatherTexture2D: {fileID: 2800000, guid: ef7a2acc27d031e4ba6390e8565f4b85, type: 3}
   mStepCount: 100
-  mShapeStepLength: 20
-  mShapeScale: 0.005
-  mShapeDensityStrength: 0.82
-  mDetailScale: 0.08
-  mDetailDensityStrength: 0.01
-  mDensityThreshold: 0.14
+  mShapeStepLength: 50
+  mShapeScale: 2.63
+  mShapeDensityStrength: 164.66
+  mDetailScale: 4.91
+  mDetailDensityStrength: 6.7
+  mDensityThreshold: 0
   mEdgeLength: 100
+  mWeatherTexture2D: {fileID: 2800000, guid: ef7a2acc27d031e4ba6390e8565f4b85, type: 3}
   mCoverageRate: 1
-  mLightStepLength: 20
+  mAnvilRate: 1
+  mLightStepLength: 50
   mCloudColorLight: {r: 1, g: 1, b: 1, a: 1}
   mCloudColorBlack: {r: 0, g: 0, b: 0, a: 1}
-  mDarknessThreshold: 0.1
+  mDarknessThreshold: 0
   mCloudAbsorption: 1
   mLightAbsorption: 1.3
   mBrightness: 1
   mForwardScattering: 0
-  mEneryParams: {x: -0.72, y: 0.72, z: 87.37, w: 0.64}
-  mCloudOffset: {x: 0, y: 0, z: 0}
-  mCloudSpeed: {x: 0.0008, y: 0, z: 0}
+  mEneryParams: {x: 0.8, y: -0.2, z: 0.5, w: 0.64}
+  mCloudOffset: {x: 64.13887, y: 26.235115, z: 0}
+  mCloudSpeed: {x: 0.02, y: 0, z: 0}
+  mWeatherOffset: {x: 2.1767638, y: 0}
+  mWeatherSpeed: {x: 0.01, y: 0}
   mShapeSpeedScale: {x: 0, y: 0, z: 0}
   mDetailSpeedScale: {x: 0, y: 0, z: 0}
   mBlueNoise: {fileID: 2800000, guid: 74b510599ad2c73458d30bec8f14998b, type: 3}
@@ -1322,8 +1326,8 @@ MonoBehaviour:
   mGridCountArray: 04000000080000001000000020000000
   mFlipWorleyNoise: 1
   mOctave: 7
-  mFrequency: 2
-  mLacunarity: 2
+  mFrequency: 4
+  mLacunarity: 4
   mPersistence: 0.5
   mOffset: {x: 0, y: 0, z: 0}
   mMoveSpeed: {x: 0, y: 0, z: 0}

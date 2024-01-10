@@ -1,4 +1,4 @@
-﻿Shader "Tezcat/CloudLevel03"
+﻿Shader "Tezcat/CloudBaseLightWithoutIntegral"
 {
 	Properties
 	{
@@ -17,8 +17,8 @@
 
 			#include "UnityCG.cginc"
 			#include "UnityLightingCommon.cginc"
-			#include "Function.cginc"
-			#include "CloudHead.cginc"
+			#include "Head/Function.cginc"
+			#include "Head/CloudHead.cginc"
 
 			struct appdata
 			{
@@ -35,23 +35,12 @@
 
 			float calculateDensity(in float3 pos, in float height)
 			{
-				float edge;
-				float height_rate = 0;
-				float4 noise;
-				if (_DrawAreaIndex == AREA_BOX)
-				{
-					edge = calculateEdgeForBox(pos, _BoxMin, _BoxMax);
-					noise = _ShapeTex3D.SampleLevel(sampler_ShapeTex3D, pos * SHAPE_SCALE + _CloudOffset, 0);
+				float edge = 1;
+				float weather = 1;
 
+				calculateWeatherAndEdge(pos, height, weather, edge);
 
-				}
-				else
-				{
-					edge = calculateEdgeForSphereArea(height);
-
-					//float3 off = float3(sin(_CloudOffset.z), sin(_CloudOffset.x), sin(_CloudOffset.y));
-					noise = _ShapeTex3D.SampleLevel(sampler_ShapeTex3D, pos * SHAPE_SCALE + _CloudOffset, 0);
-				}
+				float4 noise = _ShapeTex3D.SampleLevel(sampler_ShapeTex3D, pos * SHAPE_SCALE + _CloudOffset, 0);;
 
 
 				float fbm = dot(noise.gba, float3(0.625, 0.25, 0.125));
@@ -63,32 +52,12 @@
 			//return xyz=LightEnergy w=Transmittance
 			float3 calculateFinalColor(in float3 rayOrg, in float3 rayDir, in float3 lightDir, in float depth, in float2 uv)
 			{
-				//x距离起点的距离,y内部长度
-				float2 cloud_area_data;
 				float dst_to_begin_pos;
 				float cloud_thickness;
 
-				if (_DrawAreaIndex == AREA_BOX)
+				if (!calculateCloudThickness(rayOrg, rayDir, dst_to_begin_pos, cloud_thickness))
 				{
-					cloud_area_data = rayBoxDst(_BoxMin, _BoxMax, rayOrg, rayDir);
-					cloud_thickness = cloud_area_data.y;
-
-					if (cloud_thickness <= 0)
-					{
-						return float3(0.0f, 1.0f, 1.0f);
-					}
-
-					dst_to_begin_pos = cloud_area_data.x;
-				}
-				else
-				{
-					if (!calculatePlanetCloudData(_ViewPosition, _PlanetData, _PlanetCloudThickness, rayOrg, rayDir, cloud_area_data))
-					{
-						return float3(0.0f, 1.0f, 1.0f);
-					}
-
-					dst_to_begin_pos = cloud_area_data.x;
-					cloud_thickness = cloud_area_data.y;
+					return float3(0.0f, 1.0f, 1.0f);
 				}
 
 				float transmittance = 0.68;

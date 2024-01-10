@@ -29,16 +29,18 @@ namespace tezcat.Framework.Exp
 
         public enum CameraPos
         {
-            UnderHorizonLine = -1,
+            UnderGround = -1,
             UnderCloud = 0,
             InCloud = 1,
-            OutCloud= 2
+            OutCloud = 2
         }
 
-        [Header("Shader")]
-        public ShaderIndex mShaderIndex;
-        public Shader[] mShaders;
-        ShaderIndex mCurrentShaderIndex = ShaderIndex.Error;
+        [HideInInspector, SerializeField]
+        int mCurrnetIndex = -1;
+        [HideInInspector, SerializeField]
+        int mSetIndex = -1;
+        [HideInInspector]
+        public List<Shader> mShaderList = new List<Shader>();
 
         [Header("Data")]
         public BoxCloud mBoxCloud;
@@ -49,8 +51,7 @@ namespace tezcat.Framework.Exp
         [Header("Shape")]
         public CloudNoiseGPU mWorleyNoise;
         public DetailNoise mDetailNoise;
-        public Shader mShader;
-        public Texture2D mWeatherTexture2D;
+
         [Min(10)]
         public float mStepCount = 50;
         [Min(1)]
@@ -67,12 +68,18 @@ namespace tezcat.Framework.Exp
         public float mDensityThreshold = 0.0f;
         [Min(0.0f)]
         public float mEdgeLength = 1.0f;
+
+        [Header("Weather")]
+        public Texture2D mWeatherTexture2D;
         [Range(0.0f, 1.0f)]
         public float mCoverageRate = 1.0f;
+        [Range(0.0f, 1.0f)]
+        public float mAnvilRate = 0.0f;
 
         [Header("Lighting")]
         [Min(0.0f)]
         public float mLightStepLength = 10;
+
         public Color mCloudColorLight;
         public Color mCloudColorBlack;
         [Range(0.0f, 1.0f)]
@@ -91,6 +98,10 @@ namespace tezcat.Framework.Exp
         [Header("Motion")]
         public Vector3 mCloudOffset;
         public Vector3 mCloudSpeed;
+        [Space()]
+        public Vector2 mWeatherOffset;
+        public Vector2 mWeatherSpeed;
+        [Space()]
         public Vector3 mShapeSpeedScale;
         public Vector3 mDetailSpeedScale;
 
@@ -146,6 +157,24 @@ namespace tezcat.Framework.Exp
             }
         }
 
+        public void setShader(int i)
+        {
+            mSetIndex = i;
+            if (mSetIndex != mCurrnetIndex)
+            {
+                mCurrnetIndex = mSetIndex;
+                if (mCurrnetIndex >= 0 && mMaterial != null)
+                {
+                    mMaterial.shader = mShaderList[mCurrnetIndex];
+                }
+            }
+        }
+
+        public bool shaderUsing(int i)
+        {
+            return mCurrnetIndex == i;
+        }
+
         public void rendering(RenderTexture source, RenderTexture destination)
         {
             if (mShapeTexture.dimension != TextureDimension.Tex3D)
@@ -156,16 +185,19 @@ namespace tezcat.Framework.Exp
 
             if (mMaterial == null)
             {
-                mCurrentShaderIndex = ShaderIndex.Error;
-                mMaterial = new Material(mShaders[(int)mCurrentShaderIndex]);
-            }
+                if(mCurrnetIndex < 0)
+                {
+                    mCurrnetIndex = mShaderList.Count - 1;
+                }
 
-            if(mCurrentShaderIndex != mShaderIndex)
-            {
-                mCurrentShaderIndex = mShaderIndex;
-                mMaterial.shader = mShaders[(int)mCurrentShaderIndex];
-            }
+                if (mCurrnetIndex < 0)
+                {
+                    Graphics.Blit(source, destination);
+                    return;
+                }
 
+                mMaterial = new Material(mShaderList[mCurrnetIndex]);
+            }
 
             //-----------------------------------
             //
@@ -182,12 +214,19 @@ namespace tezcat.Framework.Exp
             //
             mMaterial.SetFloat("_StepCount", mStepCount);
             mMaterial.SetFloat("_ShapeStepLength", mShapeStepLength);
-            mMaterial.SetFloat("_ShapeScale", mShapeScale);
-            mMaterial.SetFloat("_DetailScale", mDetailScale);
             mMaterial.SetFloat("_EdgeLength", mEdgeLength);
+            mMaterial.SetFloat("_ShapeScale", mShapeScale * 0.0001f);
+            mMaterial.SetFloat("_DetailScale", mDetailScale * 0.0001f);
+            mMaterial.SetFloat("_ShapeDensityStrength", mShapeDensityStrength * 0.01f);
+            mMaterial.SetFloat("_DetailDensityStrength", mDetailDensityStrength * 0.01f);
+
+            //-----------------------------------
+            //
+            //  Weather
+            //
             mMaterial.SetFloat("_CoverageRate", mCoverageRate);
-            mMaterial.SetFloat("_ShapeDensityStrength", mShapeDensityStrength);
-            mMaterial.SetFloat("_DetailDensityStrength", mDetailDensityStrength);
+            mMaterial.SetVector("_WeatherOffset", mWeatherOffset);
+            mMaterial.SetFloat("_AnvilRate", mAnvilRate);
 
             //-----------------------------------
             //
@@ -318,20 +357,22 @@ namespace tezcat.Framework.Exp
             else
             {
                 //GG
-                mMaterial.SetInt("_ViewPosition", (int)CameraPos.UnderHorizonLine);
+                mMaterial.SetInt("_ViewPosition", (int)CameraPos.UnderGround);
             }
         }
 
         // Update is called once per frame
         void Update()
         {
-            if(this.mDrawArea == CloudArea.Planet)
+            mWeatherOffset += mWeatherSpeed * Time.deltaTime;
+
+            if (this.mDrawArea == CloudArea.Planet)
             {
-                if(mCloudOffset.x > 360.0f)
+                if (mCloudOffset.x > 360.0f)
                 {
                     mCloudOffset.x -= 360.0f;
                 }
-                else if(mCloudOffset.x < 0.0f)
+                else if (mCloudOffset.x < 0.0f)
                 {
                     mCloudOffset.x += 360.0f;
                 }

@@ -107,7 +107,7 @@ namespace tezcat.Framework.Exp
 
             for (int i = 0; i < 3; i++)
             {
-                int count = (int)Mathf.Pow(2, i + 1);
+                int count = (int)Mathf.Pow(2, i + 2);
                 this.initSamplePoint(i, count);
                 mBuffers[i] = this.createBuffer(mCSKernel, $"inSamplerPoint{i}", count, mMarkPointArray3D32[i]);
             }
