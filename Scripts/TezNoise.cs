@@ -26,6 +26,8 @@ namespace tezcat.Framework.Utility
         }
 
         #region 工具
+        public static int[] hashArray => m_HashArray;
+
         /// <summary>
         /// 双倍(复制的内容)数组长度
         /// 用于优化value(X)D中的(point&Mask)运算
@@ -247,7 +249,7 @@ namespace tezcat.Framework.Utility
         private const int m_GradientsMask2D = 7;
         private static float Sqrt2 = Mathf.Sqrt(2f);
 
-
+        public static Vector3[] gradients3D => m_Gradients3D;
         private static Vector3[] m_Gradients3D =
         {
             new Vector3( 1f, 1f, 0f),

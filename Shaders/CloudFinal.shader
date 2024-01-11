@@ -41,7 +41,7 @@
 				float high_freq_fbm = dot(detail.rgb, FBM_FACTOR);
 				float high_freq_fbm_rate = lerp(high_freq_fbm, 1 - high_freq_fbm, saturate(heightRate * 5));
 
-				float final = remap(shapeDensity, high_freq_fbm_rate * heightRate, 1.0, 0.0, 1.0);
+				float final = remap(shapeDensity, high_freq_fbm_rate, 1.0, 0.0, 1.0);
 				return max(0.0, final) * DETAIL_DENSITY_SCALE;
 			}
 
@@ -178,15 +178,19 @@
 								total_density += density_intgral;
 
 								float light_total_density = calculateLightDensity(begin_pos, lightDir);
-								float light_transmission = bearNew(light_total_density * _LightAbsorption);
+								float light_transmission = bear(light_total_density * _LightAbsorption);
 								float shadow = _DarknessThreshold + light_transmission * (1.0 - _DarknessThreshold);
 
 								final_light += density_intgral
 									* transmittance
 									* shadow
-									+ phase * transmittance * density_intgral * 0.5
+									+ density_intgral
+									* transmittance
+									* light_transmission
+									* phase 
+									* powderEffect(light_total_density) * 2
 									;
-								transmittance *= bearNew(density_intgral * _CloudAbsorption);
+								transmittance *= bear(density_intgral * _CloudAbsorption);
 
 								//提前退出
 								if (transmittance <= 0.01f)
@@ -260,7 +264,6 @@
 
 					float3 col = tex2D(_ScreenTex, i.uv);
 					float3 cloud_col = col_params.x * _Brightness * _LightColor0
-						//+ (col_params.x * col * 0.2) * (1- col_params.y)
 						+ (col_params.x * _CloudColorLight.rgb * 0.1) * (1 - col_params.y)
 						;
 

@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using tezcat.Framework.Utility;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
@@ -14,8 +15,11 @@ namespace tezcat.Framework.Exp
 
         public ComputeShader mComputeShader;
         public DetailNoise mDetailNoise;
+
         private int mCSKernel;
         private ComputeBuffer[] mSamplePointBuffers;
+        private ComputeBuffer mPerlinNoiseHashArrayBuffer = null;
+        private ComputeBuffer mPerlinNoiseGradients3D = null;
         private RenderTexture mShapeRenderTexture = null;
         private RenderTexture mShapePerlinNoiseTexture = null;
 
@@ -41,6 +45,9 @@ namespace tezcat.Framework.Exp
                 item?.Release();
             }
             mShapeRenderTexture?.Release();
+
+            mPerlinNoiseHashArrayBuffer?.Release();
+            mPerlinNoiseGradients3D?.Release();
         }
 
         private ComputeBuffer createBuffer(int count, int stride, string name, System.Array array)
@@ -125,6 +132,9 @@ namespace tezcat.Framework.Exp
                 case Dimension.ThreeD:
                     {
                         mCSKernel = mComputeShader.FindKernel("main3D");
+
+                        mPerlinNoiseHashArrayBuffer = this.createBuffer(TezNoise.hashArray.Length, sizeof(int), "inPerlinHashArray", TezNoise.hashArray);
+                        mPerlinNoiseGradients3D = this.createBuffer(TezNoise.gradients3D.Length, sizeof(float) * 3, "inPerlinGradients3D", TezNoise.gradients3D);
 
                         mShapeRenderTexture = new RenderTexture(mResolution, mResolution, 0, GraphicsFormat.R16G16B16A16_UNorm)
                         {
@@ -215,9 +225,9 @@ namespace tezcat.Framework.Exp
 
         protected override void updateData()
         {
-            foreach (var item in mRenderers)
+            for (int i = 0; i < mRenderers.Length; i++)
             {
-                item.material.SetInt("_Channel", (int)mChannel);
+                mRenderers[i].material.SetInt("_NoiseType", i);
             }
 
             this.updateColor();
@@ -225,9 +235,9 @@ namespace tezcat.Framework.Exp
 
         protected override void updateOther()
         {
-            foreach (var item in mRenderers)
+            for (int i = 0; i < mRenderers.Length; i++)
             {
-                item.material.SetInt("_Channel", (int)mChannel);
+                mRenderers[i].material.SetInt("_NoiseType", i);
             }
         }
     }

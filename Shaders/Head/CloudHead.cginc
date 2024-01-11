@@ -141,7 +141,7 @@ void calulateRayMarchDatas(in float2 uv, in float3 viewDir
 //
 //	Function
 //
-float2 squareUV(float2 uv)
+float2 squareUV(in float2 uv)
 {
 	float width = _ScreenParams.x;
 	float height = _ScreenParams.y;
@@ -152,7 +152,7 @@ float2 squareUV(float2 uv)
 	return float2 (x / scale, y / scale);
 }
 
-float2 rayBoxDst(float3 boxMin, float3 boxMax, float3 pos, float3 rayDir)
+float2 rayBoxDst(in float3 boxMin, in float3 boxMax, in float3 pos, in float3 rayDir)
 {
 	float3 t0 = (boxMin - pos) / rayDir;
 	float3 t1 = (boxMax - pos) / rayDir;
@@ -170,7 +170,7 @@ float2 rayBoxDst(float3 boxMin, float3 boxMax, float3 pos, float3 rayDir)
 	return float2(dstToBox, dstInBox);
 }
 
-float2 raySphereDst(float3 sphereCenter, float sphereRadius, float3 pos, float3 rayDir)
+float2 raySphereDst(in float3 sphereCenter, in float sphereRadius, in float3 pos, in float3 rayDir)
 {
 	float3 oc = pos - sphereCenter;
 	float b = dot(rayDir, oc);
@@ -264,7 +264,7 @@ float phaseO(in float cosAngle, in float4 energyParams)
 float phaseHZ(in float cosAngle, in float4 energyParams)
 {
 	float v1 = hgFunc(energyParams.x, cosAngle);
-	float v2 = energyParams.z * hgFunc(-energyParams.y, cosAngle);
+	float v2 = energyParams.z * hgFunc(0.99-energyParams.y, cosAngle);
 
 	return max(v1, v2);
 }
@@ -286,7 +286,7 @@ float phase2(in float cosAngle, in float4 energyParams)
 
 float phaseFunc(in float cosAngle, in float4 energyParams)
 {
-	return phasePBRBook(cosAngle, energyParams);
+	return phaseHZ(cosAngle, energyParams);
 }
 
 float powderEffect(in float value)
@@ -470,7 +470,7 @@ void calculateWeatherAndEdge(in float3 pos, in float heightRate, out float weath
 		float2 uv;
 		if (_DrawAreaIndex == AREA_HORIZON_LINE)
 		{
-			uv = (pos.xz * 100 / (_PlanetData.w + _PlanetCloudThickness.x) + 0.5) + _WeatherOffset;
+			uv = (pos.xz / (_PlanetData.w + _PlanetCloudThickness.y)* 0.5 + 0.5) * 100 + _WeatherOffset;
 			weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, uv, 0).r;
 		}
 		else

@@ -74,13 +74,16 @@ Material:
     - _Metallic: 0
     - _Mix: 0
     - _Mode: 0
+    - _NoiseType: 2
     - _OcclusionStrength: 1
     - _Parallax: 0.02
+    - _PerlinWorley: 0
     - _ShapeThreshold: 0
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _UVSec: 0
+    - _Worley8: 0.14
     - _ZWrite: 1
     m_Colors:
     - _Color: {r: 1, g: 1, b: 1, a: 1}

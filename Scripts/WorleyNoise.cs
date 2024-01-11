@@ -10,20 +10,7 @@ namespace tezcat.Framework.Exp
             ThreeD = 3
         }
 
-        public enum Channel
-        {
-            C0 = 0,
-            C1,
-            C2,
-            C3,
-            C123,
-            C123FBM,
-            Shape,
-            ShapeWithFBM,
-            ShapeWithDetail
-        }
         public bool mUpdate = false;
-        public Channel mChannel = Channel.C0;
 
         [Header("Worley Noise", order = 0)]
         public Dimension mDimension = Dimension.TowD;
@@ -49,10 +36,15 @@ namespace tezcat.Framework.Exp
 
         [Header("Viewer")]
         public Renderer[] mRenderers;
+        public Shader mViewerShader;
 
 
         private void Start()
         {
+            foreach (var item in mRenderers)
+            {
+                item.material = new Material(mViewerShader);
+            }
             this.init();
         }
 
