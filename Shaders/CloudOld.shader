@@ -267,7 +267,7 @@
 
 							float light_data = calculateLightData(begin_pos, lightDir);
 							light_total_energy += transmittance
-								* calulateLightEnergy(light_data, phase, _LightAbsorption, _DarknessThreshold)
+								* calulateLightEnergyOld(light_data, phase, _LightAbsorption, _DarknessThreshold)
 								* _CloudColorBlack.rgb;
 							transmittance *= bearNew(step_thickness * step_density * _CloudAbsorption);
 							begin_pos += step_dir_length;

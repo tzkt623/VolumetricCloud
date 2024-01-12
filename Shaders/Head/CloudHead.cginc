@@ -264,7 +264,7 @@ float phaseO(in float cosAngle, in float4 energyParams)
 float phaseHZ(in float cosAngle, in float4 energyParams)
 {
 	float v1 = hgFunc(energyParams.x, cosAngle);
-	float v2 = energyParams.z * hgFunc(0.99-energyParams.y, cosAngle);
+	float v2 = energyParams.z * hgFunc(0.99 - energyParams.y, cosAngle);
 
 	return max(v1, v2);
 }
@@ -324,7 +324,16 @@ float calulateLightEnergy2(in float density, in float height, in float phaseValu
 	return absorption_scattering * in_scatter_probability * phaseValue;
 }
 
-float calulateLightEnergy(in float density, in float phaseValue, in float lightAbsorption, in float darknessThreshold)
+float calculateInScatter(in float heightRate, in float density)
+{
+	float depth_probability = 0.05 + pow(density, remap(heightRate, 0.3, 0.85, 0.5, 2.0));
+	float vertical_probability = pow(remap(heightRate, 0.07, 0.14, 0.1, 1.0), 0.8);
+	float in_scatter_probability = saturate(depth_probability) * saturate(vertical_probability);
+
+	return in_scatter_probability;
+}
+
+float calulateLightEnergyOld(in float density, in float phaseValue, in float lightAbsorption, in float darknessThreshold)
 {
 	//float temp_density = density * _LightAbsorption;
 
@@ -336,14 +345,39 @@ float calulateLightEnergy(in float density, in float phaseValue, in float lightA
 	return darknessThreshold + energy * (1 - darknessThreshold);
 }
 
-float calculateInScatter(in float heightRate, in float density)
+float calculateLightEnergyHZ(in float rayDensityIntgral, in float transmittance, in float lightTotalDensity, in float phase, in float heightRate)
 {
-	float depth_probability = 0.05 + pow(density, remapPositive(heightRate, 0.3, 0.85, 0.5, 2.0));
-	float vertical_probability = pow(remapPositive(heightRate, 0.07, 0.14, 0.1, 1.0), 0.8);
-	float in_scatter_probability = depth_probability * vertical_probability;
+	float absorption = bearNew(lightTotalDensity * _LightAbsorption);
+	//float in_scattering = powderEffect(density);
+	float in_scattering = calculateInScatter(heightRate, lightTotalDensity * _LightAbsorption);
 
-	return in_scatter_probability;
 
+	float energy = absorption * in_scattering * phase;
+	float shadow = _DarknessThreshold + absorption * (1.0 - _DarknessThreshold);
+
+	return (energy + shadow) * rayDensityIntgral * transmittance;
+}
+
+
+float calculateLightEnergyMy(in float rayDensityIntgral, in float transmittance, in float lightTotalDensity, in float phase, in float heightRate)
+{
+	float light_transmission = bear(lightTotalDensity * _LightAbsorption);
+	float shadow = _DarknessThreshold + light_transmission * (1.0 - _DarknessThreshold);
+
+	return rayDensityIntgral * transmittance * shadow
+		+ rayDensityIntgral
+		* transmittance
+		* light_transmission
+		* phase
+		//* powderEffect(light_total_density) * 2
+		* calculateInScatter(heightRate, rayDensityIntgral)
+		;
+}
+
+float calculateLightEnergy(in float rayDensityIntgral, in float transmittance, in float lightTotalDensity, in float phase, in float heightRate)
+{
+	//return calculateLightEnergyMy(rayDensityIntgral, transmittance, lightTotalDensity, phase, heightRate);
+	return calculateLightEnergyHZ(rayDensityIntgral, transmittance, lightTotalDensity, phase, heightRate);
 }
 
 //----------------------------------------------------
@@ -470,7 +504,7 @@ void calculateWeatherAndEdge(in float3 pos, in float heightRate, out float weath
 		float2 uv;
 		if (_DrawAreaIndex == AREA_HORIZON_LINE)
 		{
-			uv = (pos.xz / (_PlanetData.w + _PlanetCloudThickness.y)* 0.5 + 0.5) * 100 + _WeatherOffset;
+			uv = (pos.xz / (_PlanetData.w + _PlanetCloudThickness.y) * 0.5 + 0.5) * 100 + _WeatherOffset;
 			weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, uv, 0).r;
 		}
 		else
