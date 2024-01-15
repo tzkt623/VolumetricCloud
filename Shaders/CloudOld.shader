@@ -60,16 +60,16 @@
 				float edge_x_rate = 1;
 				float edge_z_rate = 1;
 				float edge_y_rate = 1;
-				if (_EdgeLength > 0.0f)
-				{
-					float edge_x_length = min(target.x - _BoxMin.x, _BoxMax.x - target.x);
-					float edge_z_length = min(target.z - _BoxMin.z, _BoxMax.z - target.z);
-					float edge_y_length = min(target.y - _BoxMin.y, _BoxMax.y - target.y);
+				//if (_EdgeLength > 0.0f)
+				//{
+				//	float edge_x_length = min(target.x - _BoxMin.x, _BoxMax.x - target.x);
+				//	float edge_z_length = min(target.z - _BoxMin.z, _BoxMax.z - target.z);
+				//	float edge_y_length = min(target.y - _BoxMin.y, _BoxMax.y - target.y);
 
-					edge_x_rate = min(_EdgeLength, edge_x_length) / _EdgeLength;
-					edge_z_rate = min(_EdgeLength, edge_z_length) / _EdgeLength;
-					edge_y_rate = min(_EdgeLength, edge_y_length) / _EdgeLength;
-				}
+				//	edge_x_rate = min(_EdgeLength, edge_x_length) / _EdgeLength;
+				//	edge_z_rate = min(_EdgeLength, edge_z_length) / _EdgeLength;
+				//	edge_y_rate = min(_EdgeLength, edge_y_length) / _EdgeLength;
+				//}
 
 				float3 base_shape_with_cloud_types = base_shape * edge_x_rate * edge_z_rate * edge_y_rate;// *cloud_type;
 				base_shape_with_cloud_types *= remap(base_shape_with_cloud_types, _CoverageRate, 1.0, 0.0, 1.0);

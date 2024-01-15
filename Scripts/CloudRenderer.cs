@@ -66,8 +66,6 @@ namespace tezcat.Framework.Exp
         public float mDetailDensityStrength = 1.0f;
         [Range(0.0f, 1.0f)]
         public float mDensityThreshold = 0.0f;
-        [Min(0.0f)]
-        public float mEdgeLength = 1.0f;
 
         [Header("Weather")]
         public Texture2D mWeatherTexture2D;
@@ -216,7 +214,6 @@ namespace tezcat.Framework.Exp
             //
             mMaterial.SetFloat("_StepCount", mStepCount);
             mMaterial.SetFloat("_ShapeStepLength", mShapeStepLength);
-            mMaterial.SetFloat("_EdgeLength", mEdgeLength);
             mMaterial.SetFloat("_ShapeScale", mShapeScale * 0.00001f);
             mMaterial.SetFloat("_DetailScale", mDetailScale * 0.00001f);
 

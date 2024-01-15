@@ -36,7 +36,7 @@ float _DetailScale;
 float _ShapeDensityStrength;
 float _DetailDensityStrength;
 float _DensityThreshold;
-float _EdgeLength;
+//float _EdgeLength;
 #define SHAPE_SCALE (_ShapeScale)
 #define DETAIL_SCALE (_DetailScale)
 #define SHAPE_DENSITY_SCALE (_ShapeDensityStrength )
