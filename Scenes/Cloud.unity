@@ -201,7 +201,7 @@ GameObject:
   m_Layer: 0
   m_Name: WorleyShape
   m_TagString: Untagged
-  m_Icon: {fileID: -964228994112308473, guid: 0000000000000000d000000000000000, type: 0}
+  m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
@@ -716,7 +716,7 @@ GameObject:
   m_Layer: 0
   m_Name: Perlin
   m_TagString: Untagged
-  m_Icon: {fileID: -964228994112308473, guid: 0000000000000000d000000000000000, type: 0}
+  m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
@@ -1162,7 +1162,7 @@ GameObject:
   m_Layer: 0
   m_Name: Combine
   m_TagString: Untagged
-  m_Icon: {fileID: -964228994112308473, guid: 0000000000000000d000000000000000, type: 0}
+  m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
@@ -1646,17 +1646,18 @@ MonoBehaviour:
   mDetailNoise: {fileID: 1975134052}
   mStepCount: 100
   mShapeStepLength: 50
-  mShapeScale: 0.4
-  mShapeDensityStrength: 180.56
-  mDetailScale: 5.7
-  mDetailDensityStrength: 5.2
-  mDensityThreshold: 0.35
+  mShapeScale: 12.9
+  mShapeDensityStrength: 27.7
+  mDetailScale: 129
+  mDetailDensityStrength: 21.5
+  mDensityThreshold: 0.11
   mEdgeLength: 100
   mWeatherTexture2D: {fileID: 2800000, guid: ef7a2acc27d031e4ba6390e8565f4b85, type: 3}
   mCoverageRate: 1
-  mAnvilRate: 1
+  mAnvilRate: 0
+  mWeatherScale: 461.7
   mLightStepLength: 50
-  mCloudColorLight: {r: 0.4039216, g: 0.48627454, b: 0.6039216, a: 1}
+  mCloudColorLight: {r: 1, g: 1, b: 1, a: 1}
   mCloudColorBlack: {r: 0, g: 0, b: 0, a: 1}
   mDarknessThreshold: 0
   mCloudAbsorption: 1
@@ -1664,8 +1665,8 @@ MonoBehaviour:
   mBrightness: 1
   mForwardScattering: 0
   mEneryParams: {x: 0.52, y: 0.12, z: 0.11, w: 0.64}
-  mCloudOffset: {x: 77.27378, y: 26.235115, z: 0}
-  mCloudSpeed: {x: 0.01, y: 0, z: 0}
+  mCloudOffset: {x: 0, y: 0, z: 0}
+  mCloudSpeed: {x: 0, y: 0, z: 0}
   mWeatherOffset: {x: 0, y: 6.72}
   mWeatherSpeed: {x: 0, y: 0}
   mShapeSpeedScale: {x: 0, y: 0, z: 0}
@@ -2202,7 +2203,7 @@ GameObject:
   m_Layer: 0
   m_Name: WorleyDetail
   m_TagString: Untagged
-  m_Icon: {fileID: -964228994112308473, guid: 0000000000000000d000000000000000, type: 0}
+  m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1

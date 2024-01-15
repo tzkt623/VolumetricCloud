@@ -58,7 +58,7 @@ namespace tezcat.Framework.Exp
         public float mShapeStepLength = 50;
         [Min(0.0f)]
         public float mShapeScale = 0.1f;
-        [Min(0.01f)]
+        [Min(0.0f)]
         public float mShapeDensityStrength = 1.0f;
         [Min(0.0f)]
         public float mDetailScale = 0.1f;
@@ -75,6 +75,8 @@ namespace tezcat.Framework.Exp
         public float mCoverageRate = 1.0f;
         [Range(0.0f, 1.0f)]
         public float mAnvilRate = 0.0f;
+        [Min(0.0001f)]
+        public float mWeatherScale = 0.0f;
 
         [Header("Lighting")]
         [Min(0.0f)]
@@ -215,10 +217,14 @@ namespace tezcat.Framework.Exp
             mMaterial.SetFloat("_StepCount", mStepCount);
             mMaterial.SetFloat("_ShapeStepLength", mShapeStepLength);
             mMaterial.SetFloat("_EdgeLength", mEdgeLength);
-            mMaterial.SetFloat("_ShapeScale", mShapeScale * 0.0001f);
-            mMaterial.SetFloat("_DetailScale", mDetailScale * 0.0001f);
-            mMaterial.SetFloat("_ShapeDensityStrength", mShapeDensityStrength * 0.01f);
-            mMaterial.SetFloat("_DetailDensityStrength", mDetailDensityStrength * 0.01f);
+            mMaterial.SetFloat("_ShapeScale", mShapeScale * 0.00001f);
+            mMaterial.SetFloat("_DetailScale", mDetailScale * 0.00001f);
+
+            const float modifier = 1000.0f;
+            mShapeDensityStrength = Mathf.Min(mShapeDensityStrength, modifier);
+            mDetailDensityStrength = Mathf.Min(mDetailDensityStrength, modifier);
+            mMaterial.SetFloat("_ShapeDensityStrength", mShapeDensityStrength / modifier);
+            mMaterial.SetFloat("_DetailDensityStrength", mDetailDensityStrength / modifier);
 
             //-----------------------------------
             //
@@ -227,6 +233,7 @@ namespace tezcat.Framework.Exp
             mMaterial.SetFloat("_CoverageRate", mCoverageRate);
             mMaterial.SetVector("_WeatherOffset", mWeatherOffset);
             mMaterial.SetFloat("_AnvilRate", mAnvilRate);
+            mMaterial.SetFloat("_WeatherScale", mWeatherScale);
 
             //-----------------------------------
             //

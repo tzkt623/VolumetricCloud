@@ -55,6 +55,7 @@ static float3 FBM_FACTOR = float3(0.625, 0.25, 0.125);
 float2 _WeatherOffset;
 float _CoverageRate;
 float _AnvilRate;
+float _WeatherScale;
 
 //-----------------------
 //
@@ -269,24 +270,16 @@ float phaseHZ(in float cosAngle, in float4 energyParams)
 	return max(v1, v2);
 }
 
-//http://www.pbr-book.org/3ed-2018/Volume_Scattering/Phase_Functions.html
-float phasePBRBook(in float cosAngle, in float4 energyParams)
+float phaseDualLobe(in float cosAngle, in float4 energyParams)
 {
 	float v1 = hgFunc(energyParams.x, cosAngle);
 	float v2 = hgFunc(energyParams.y, cosAngle);
 	return lerp(v1, v2, energyParams.z);
 }
 
-float phase2(in float cosAngle, in float4 energyParams)
-{
-	float v1 = hgFunc(energyParams.x, cosAngle);
-	float v2 = hgFunc(energyParams.y, cosAngle);
-	return lerp(v1, v2, clamp(cosAngle * 0.5 + 0.5, 0.0, 1.0));
-}
-
 float phaseFunc(in float cosAngle, in float4 energyParams)
 {
-	return phaseHZ(cosAngle, energyParams);
+	return phaseDualLobe(cosAngle, energyParams);
 }
 
 float powderEffect(in float value)
@@ -352,32 +345,38 @@ float calculateLightEnergyHZ(in float rayDensityIntgral, in float transmittance,
 	float in_scattering = calculateInScatter(heightRate, lightTotalDensity * _LightAbsorption);
 
 
-	float energy = absorption * in_scattering * phase;
-	float shadow = _DarknessThreshold + absorption * (1.0 - _DarknessThreshold);
+	float energy = (absorption + in_scattering * phase) * rayDensityIntgral * transmittance;
+	//float shadow = _DarknessThreshold + absorption * (1.0 - _DarknessThreshold);
 
-	return (energy + shadow) * rayDensityIntgral * transmittance;
+	return energy;
 }
 
 
 float calculateLightEnergyMy(in float rayDensityIntgral, in float transmittance, in float lightTotalDensity, in float phase, in float heightRate)
 {
-	float light_transmission = bear(lightTotalDensity * _LightAbsorption);
-	float shadow = _DarknessThreshold + light_transmission * (1.0 - _DarknessThreshold);
+	float absorption = bearNew(lightTotalDensity * _LightAbsorption);
+	float shadow = _DarknessThreshold + absorption * (1.0 - _DarknessThreshold);
 
-	return rayDensityIntgral * transmittance * shadow
-		+ rayDensityIntgral
-		* transmittance
-		* light_transmission
-		* phase
-		//* powderEffect(light_total_density) * 2
-		* calculateInScatter(heightRate, rayDensityIntgral)
-		;
+	//return shadow * powderEffect(lightTotalDensity) * 2 * phase
+	//	* rayDensityIntgral * transmittance;
+
+	return (shadow + absorption * powderEffect(lightTotalDensity) * 2 * phase)
+		* rayDensityIntgral * transmittance;
+
+	//return rayDensityIntgral * transmittance * shadow
+	//	+ rayDensityIntgral
+	//	* transmittance
+	//	* absorption
+	//	* phase
+	//	* powderEffect(lightTotalDensity) * 2
+	//	;
 }
 
 float calculateLightEnergy(in float rayDensityIntgral, in float transmittance, in float lightTotalDensity, in float phase, in float heightRate)
 {
-	//return calculateLightEnergyMy(rayDensityIntgral, transmittance, lightTotalDensity, phase, heightRate);
-	return calculateLightEnergyHZ(rayDensityIntgral, transmittance, lightTotalDensity, phase, heightRate);
+	//return 2 * bear(lightTotalDensity) * powderEffect(lightTotalDensity) * rayDensityIntgral * transmittance;
+	return calculateLightEnergyMy(rayDensityIntgral, transmittance, lightTotalDensity, phase, heightRate);
+	//return calculateLightEnergyHZ(rayDensityIntgral, transmittance, lightTotalDensity, phase, heightRate);
 }
 
 //----------------------------------------------------
@@ -496,7 +495,7 @@ void calculateWeatherAndEdge(in float3 pos, in float heightRate, out float weath
 	if (_DrawAreaIndex == AREA_BOX)
 	{
 		edge = calculateEdgeForBox(pos, _BoxMin, _BoxMax);
-		weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, (pos.xz - _BoxMin.xz) / (_BoxMax.xz - _BoxMin.xz), 0).r * _CoverageRate;
+		weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, (pos.xz - _BoxMin.xz) / (_BoxMax.xz - _BoxMin.xz) * _WeatherScale, 0).r;
 	}
 	else
 	{
@@ -504,12 +503,12 @@ void calculateWeatherAndEdge(in float3 pos, in float heightRate, out float weath
 		float2 uv;
 		if (_DrawAreaIndex == AREA_HORIZON_LINE)
 		{
-			uv = (pos.xz / (_PlanetData.w + _PlanetCloudThickness.y) * 0.5 + 0.5) * 100 + _WeatherOffset;
-			weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, uv, 0).r;
+			uv = (pos.xz * _WeatherScale / (_PlanetData.w + _PlanetCloudThickness.y) * 0.5 + 0.5) + _WeatherOffset;
+			weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, uv , 0).r;
 		}
 		else
 		{
-			float3 pos_dir = normalize(pos - _PlanetData.xyz);
+			float3 pos_dir = normalize(pos * _WeatherScale - _PlanetData.xyz);
 			float3 bottom = float3(0, -1, 0);
 			float3 back = float3(-1, 0, 0);
 			uv = float2(dot(pos_dir, bottom) * 0.5 + 0.5, dot(pos_dir, back) * 0.5 + 0.5) + _WeatherOffset;
