@@ -234,7 +234,7 @@ namespace tezcat.Framework.Utility
         private static float[] m_Gradients1D = { 1f, -1f };
         private const int m_GradientsMask1D = 1;
 
-
+        public static Vector2[] gradients2D => m_Gradients2D;
         private static Vector2[] m_Gradients2D =
         {
             new Vector2( 1f, 0f),

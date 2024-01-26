@@ -162,6 +162,5 @@ namespace tezcat.Framework.Exp
             mGridLengthArray[index] = grid_length;
             mGridRateArray[index] = 1.0f / gridCount;
         }
-
     }
 }

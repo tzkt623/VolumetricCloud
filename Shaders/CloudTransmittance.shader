@@ -130,14 +130,11 @@
 
 				cloud_thickness = min(cloud_thickness, _ProjectionParams.z);
 
-				//float t = abs(dot(rayDir, float3(0, 1, 0)));
-				//int stepCount = lerp(128.0f, 64.0f, t);
-
 				float step_thickness = _ShapeStepLength;
 				float3 step_dir_length = rayDir * step_thickness;
 
 				float cos_angle = dot(rayDir, lightDir);
-				float phase = phaseFunc(cos_angle, _EnergyParams);
+				float phase = phaseFunc(cos_angle, _PhaseParams);
 
 				float transmittance = 1.0;
 				float final_light = 0;
@@ -251,7 +248,7 @@
 
 					float3 col = tex2D(_ScreenTex, i.uv);
 					float3 cloud_col = (1 - col_params.x)
-						* _Brightness 
+						* _EnergyStrength.z 
 						* _LightColor0
 						;
 

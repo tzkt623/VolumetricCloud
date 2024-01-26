@@ -137,7 +137,7 @@
 				float3 step_dir_length = rayDir * step_thickness;
 
 				float cos_angle = dot(rayDir, lightDir);
-				float phase = phaseFunc(cos_angle, _EnergyParams);
+				float phase = phaseFunc(cos_angle, _PhaseParams);
 
 				float transmittance = 1.0;
 				float final_light = 0;

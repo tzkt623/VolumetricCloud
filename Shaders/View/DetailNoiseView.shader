@@ -46,6 +46,7 @@
                 // sample the texture
                 float4 col = float4(1, 0, 0, 1);
 
+                
                 switch (_DetailLevel)
                 {
                 case 0:
@@ -61,9 +62,13 @@
                     //col.rgb = float4(0, 0, 1, 0);
                     break;
                 case 3:
+                    col.rgb = tex3D(_DetailTex3D, i.uvw).rgb;
+                    break;
+                case 4:
                     col.rgb = tex3D(_DetailTex3D, i.uvw).aaa;
                     break;
                 }
+                
 
                 return col;
             }

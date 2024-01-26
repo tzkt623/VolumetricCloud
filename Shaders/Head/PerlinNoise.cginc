@@ -2,9 +2,13 @@
 #define Perlin_Noise
 
 #include "Function.cginc"
+static int mHashMask = 255;
 
 StructuredBuffer<int> inPerlinHashArray;
+
+StructuredBuffer<float2> inPerlinGradients2D;
 StructuredBuffer<float3> inPerlinGradients3D;
+
 
 //-----------------------------------------
 //
@@ -13,6 +17,11 @@ StructuredBuffer<float3> inPerlinGradients3D;
 float perlinSmooth(float t)
 {
 	return t * t * t * (t * (t * 6.f - 15.f) + 10.f);
+}
+
+float perlinDot(float2 g, float x, float y)
+{
+    return g.x * x + g.y * y;
 }
 
 float perlinDot(float3 g, float x, float y, float z)
@@ -25,10 +34,57 @@ float perlinSelect(float a, float b, bool flag)
 	return flag ? b : a;
 }
 
+//----------------------------------------------
+//
+//
+float perlin2D(in StructuredBuffer<int> hashArray, in StructuredBuffer<float2> gradients2D
+	, in float2 pos, in float frequency)
+{
+	const int gradient_mask = 7;
+
+    int ix0 = floor(pos.x);
+    int iy0 = floor(pos.y);
+
+    float tx0 = pos.x - ix0;
+    float tx1 = tx0 - 1.f;
+
+    float ty0 = pos.y - iy0;
+    float ty1 = ty0 - 1.f;
+
+	ix0 %= frequency;
+	ix0 = perlinSelect(ix0, ix0 + frequency, ix0 < 0);
+	iy0 %= frequency;
+	iy0 = perlinSelect(iy0, iy0 + frequency, iy0 < 0);
+
+    ix0 &= mHashMask;
+    iy0 &= mHashMask;
+
+    int ix1 = (ix0 + 1) % frequency;
+    int iy1 = (iy0 + 1) % frequency;
+
+    int h0 = hashArray[ix0];
+    int h1 = hashArray[ix1];
+
+    float2 g00 = gradients2D[hashArray[h0 + iy0] & gradient_mask];
+    float2 g10 = gradients2D[hashArray[h1 + iy0] & gradient_mask];
+    float2 g01 = gradients2D[hashArray[h0 + iy1] & gradient_mask];
+    float2 g11 = gradients2D[hashArray[h1 + iy1] & gradient_mask];
+
+    float v00 = perlinDot(g00, tx0, ty0);
+    float v10 = perlinDot(g10, tx1, ty0);
+    float v01 = perlinDot(g01, tx0, ty1);
+    float v11 = perlinDot(g11, tx1, ty1);
+
+    float tx = perlinSmooth(tx0);
+    float ty = perlinSmooth(ty0);
+
+    return lerp(lerp(v00, v10, tx), lerp(v01, v11, tx), ty) * sqrt(2.0f);
+}
+
+//--------------------------------------------------
 float perlin3D(in StructuredBuffer<int> hashArray, in StructuredBuffer<float3> gradients3D
 	, in float3 pos, in float frequency)
 {
-	const int hash_mask = 255;
 	const int gradient_mask = 15;
 
 	//pos *= frequency;
@@ -51,9 +107,9 @@ float perlin3D(in StructuredBuffer<int> hashArray, in StructuredBuffer<float3> g
 	iz0 %= frequency;
 	iz0 = perlinSelect(iz0, iz0 + frequency, iz0 < 0);
 
-	ix0 &= hash_mask;//m_HashMask;
-	iy0 &= hash_mask;//m_HashMask;
-	iz0 &= hash_mask;//m_HashMask;
+	ix0 &= mHashMask;//m_HashMask;
+	iy0 &= mHashMask;//m_HashMask;
+	iz0 &= mHashMask;//m_HashMask;
 
 	int ix1 = (ix0 + 1) % frequency;
 	int iy1 = (iy0 + 1) % frequency;
@@ -93,6 +149,14 @@ float perlin3D(in StructuredBuffer<int> hashArray, in StructuredBuffer<float3> g
 		lerp(lerp(v000, v100, tx), lerp(v010, v110, tx), ty),
 		lerp(lerp(v001, v101, tx), lerp(v011, v111, tx), ty),
 		tz);
+}
+
+//-----------------------------------------------------------
+//
+//
+float pn2D(in float2 pos, in float freq)
+{
+	return perlin2D(inPerlinHashArray, inPerlinGradients2D, pos, freq);
 }
 
 float pn3D(in float3 pos, in float freq)

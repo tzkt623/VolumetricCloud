@@ -5,16 +5,16 @@ using UnityEngine;
 
 namespace tezcat.Framework.Exp
 {
-    [CustomEditor(typeof(CloudNoiseGPU))]
+    [CustomEditor(typeof(CloudNoiseGenerator))]
     public class NoiseViewer : Editor
     {
-        CloudNoiseGPU mNoise;
+        CloudNoiseGenerator mNoise;
         Material mTexMat = null;
         Vector2 mSPos = new Vector2();
 
         private void OnEnable()
         {
-            mNoise = this.target as CloudNoiseGPU;
+            mNoise = this.target as CloudNoiseGenerator;
         }
 
         public override void OnInspectorGUI()

@@ -223,7 +223,7 @@
 				float3 light_total_energy = 0;
 
 				float cos_angle = dot(rayDir, lightDir);
-				float phase = phaseFunc(cos_angle, _EnergyParams);
+				float phase = phaseFunc(cos_angle, _PhaseParams);
 
 				float random_offset = 0;
 				if (_BlueNoiseIntensity > 1)

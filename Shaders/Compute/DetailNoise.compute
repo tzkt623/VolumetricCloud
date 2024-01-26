@@ -3,36 +3,44 @@
 #include "../Head/WorleyNoise.cginc"
 
 RWTexture3D<float4> outDetailTex3D;
-StructuredBuffer<int3> inSamplerPoint0;
-StructuredBuffer<int3> inSamplerPoint1;
-StructuredBuffer<int3> inSamplerPoint2;
 
-int inGridLength;
-int inGridCount1;
-int inGridCount2;
-int inGridCount3;
+StructuredBuffer<int3> inDetailWLMarkPoints3D0;
+StructuredBuffer<int3> inDetailWLMarkPoints3D1;
+StructuredBuffer<int3> inDetailWLMarkPoints3D2;
+StructuredBuffer<int> inDetailWLGroupGridCount;
+
 int inResolution;
-float inGridRate;
-float3 inOffset;
-bool inFlip;
-float inFrequency;
+bool inDetailWLFlip;
+float3 inDetailWLOffset;
+float inDetailWLFrequency;
 
-float calculateWorleyNoise(in StructuredBuffer<int3> samplerPoint, in int gridCount, in int gridLength, in float rate, float3 pos, float freq)
+float calculateWorleyNoise(in StructuredBuffer<int3> samplePoints, in int gridCount, in float3 pos, float freq)
 {
+	float grid_rate = 1.0f / gridCount;
+	int grid_length = inResolution / gridCount;
+
 	float strength = 1.0f;
-	float sum_strength = 1.0f;
+	float sum_strength = 0.0f;
 	float noise = 0;
-	for (int o = 0; o < 3; o++)
+	
+	for (int i = 0; i < 3; i++)
 	{
-		noise += getNoiseF(samplerPoint, inResolution, pos * freq + inOffset, gridCount, gridLength, rate) * strength;
-		
+		noise += getNoiseF(samplePoints, inResolution
+			, pos * freq + inDetailWLOffset
+			, gridCount, grid_length, grid_rate) * strength;
+
+		sum_strength += strength;
 		freq *= 2.0f;
 		strength *= 0.5f;
-		sum_strength += strength;
 	}
 
 	noise /= sum_strength;
-
+	
+	if (inDetailWLFlip)
+	{
+		noise = 1 - noise;
+	}
+	
 	return noise;
 }
 
@@ -44,26 +52,13 @@ void main3D(uint3 id : SV_DispatchThreadID)
 		, id.y / (float)inResolution
 		, id.z / (float)inResolution);
 
-	const int grid_count0 = 4;
-	const int grid_count1 = 8;
-	const int grid_count2 = 16;
+	int grid_count0 = inDetailWLGroupGridCount[0];
+	int grid_count1 = inDetailWLGroupGridCount[1];
+	int grid_count2 = inDetailWLGroupGridCount[2];
 
-	float worley00 = calculateWorleyNoise(
-		inSamplerPoint0, grid_count0, inResolution / grid_count0, 1.0 / grid_count0
-		, pos, 1);
-	float worley01 = calculateWorleyNoise(
-		inSamplerPoint1, grid_count1, inResolution / grid_count1, 1.0 / grid_count1
-		, pos, 1);
-	float worley02 = calculateWorleyNoise(
-		inSamplerPoint2, grid_count2, inResolution / grid_count2, 1.0 / grid_count2
-		, pos, 1);
-
-	if (inFlip)
-	{
-		worley00 = 1 - worley00;
-		worley01 = 1 - worley01;
-		worley02 = 1 - worley02;
-	}
+	float worley00 = calculateWorleyNoise(inDetailWLMarkPoints3D0, grid_count0, pos, inDetailWLFrequency);
+	float worley01 = calculateWorleyNoise(inDetailWLMarkPoints3D1, grid_count1, pos, inDetailWLFrequency);
+	float worley02 = calculateWorleyNoise(inDetailWLMarkPoints3D2, grid_count2, pos, inDetailWLFrequency);
 
 	float worley_fbm = dot(float3(worley00, worley01, worley02), float3(0.625, 0.25, 0.125));
 

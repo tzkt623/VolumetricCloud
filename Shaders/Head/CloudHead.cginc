@@ -19,8 +19,11 @@ SamplerState sampler_ShapeTex3D;
 Texture3D<float4> _DetailTex3D;
 SamplerState sampler_DetailTex3D;
 
-Texture2D _WeatherTex2D;
+Texture2D<float4> _WeatherTex2D;
 SamplerState sampler_WeatherTex2D;
+
+Texture2D<float4> _HeightTypeTex2D;
+SamplerState sampler_HeightTypeTex2D;
 
 Texture2D _BlueNoiseTex2D;
 SamplerState sampler_BlueNoiseTex2D;
@@ -36,7 +39,7 @@ float _DetailScale;
 float _ShapeDensityStrength;
 float _DetailDensityStrength;
 float _DensityThreshold;
-//float _EdgeLength;
+float _DensityScale;
 #define SHAPE_SCALE (_ShapeScale)
 #define DETAIL_SCALE (_DetailScale)
 #define SHAPE_DENSITY_SCALE (_ShapeDensityStrength )
@@ -65,11 +68,13 @@ float3 _ShapeSpeedScale;
 float3 _DetailSpeedScale;
 float3 _CloudOffset;
 float3 _CloudSpeed;
+float3 _WindDirection;
 
 //----------------------------
 //
 // Light
 //
+float3 _LightDir;
 float _LightStepLength;
 float4 _CloudColorLight;
 float4 _CloudColorBlack;
@@ -77,8 +82,9 @@ float _CloudAbsorption;
 float _LightAbsorption;
 float _DarknessThreshold;
 float _ForwardScatteringScale;
-float4 _EnergyParams;
-float _Brightness;
+float4 _PhaseParams;
+float3 _EnergyStrength;
+int _MSOctave;
 
 //--------------------------
 //
@@ -287,6 +293,12 @@ float powderEffect(in float value)
 	return 1.0f - exp(-value * 2.0f);
 }
 
+float powderEffect(in float value, in float cosAngle)
+{
+	float powder = 1.0 - exp(-value * 2.0);
+	return lerp(1.0f, powder, (cosAngle * 0.5f) + 0.5f);
+}
+
 //HZ Funcion
 float bearPowder(float value)
 {
@@ -304,6 +316,33 @@ float bear(float value)
 float bearNew(float value)
 {
 	return max(exp(-value), exp(-value * 0.25) * 0.7);
+}
+
+float3 multipleScattering(in float energy, in float cosAngle, in float density, in float stepThickness, in float sigmaE)
+{
+    float3 luminance = 0.0;
+
+    // Attenuation
+    float a = 1.0;
+    // Contribution
+    float b = 1.0;
+    // Phase attenuation
+    float c = 1.0;
+
+	float phase = 0;
+	
+    for(float i = 0.0; i < _MSOctave; i++)
+	{
+		phase = phaseFunc(cosAngle, float4(_PhaseParams.x * c, _PhaseParams.y * c, _PhaseParams.z, 0.0));
+		//sigmaS * bi * Li(wi) * P(wi, wo, ci*g) * exp(-ai * sigmaT * (s)ds)
+		luminance += _EnergyStrength.y * b * energy * phase * exp(-a * sigmaE * stepThickness * density);
+        a *= 0.5;
+        b *= 0.5;
+		//b *= 2.5
+        c *= 0.5;
+    }
+
+    return luminance;
 }
 
 float calulateLightEnergy2(in float density, in float height, in float phaseValue, float step_size)
@@ -338,51 +377,106 @@ float calulateLightEnergyOld(in float density, in float phaseValue, in float lig
 	return darknessThreshold + energy * (1 - darknessThreshold);
 }
 
-float calculateLightEnergyHZ(in float rayDensityIntgral, in float transmittance, in float lightTotalDensity, in float phase, in float heightRate)
+void calculateLightEnergyHZ(inout float4 energy, in float cloudDensity, in float lightTotalDensity, in float phase
+	, in float heightRate, in float stepThickness, in float cosAngle)
 {
 	float absorption = bearNew(lightTotalDensity * _LightAbsorption);
-	//float in_scattering = powderEffect(density);
 	float in_scattering = calculateInScatter(heightRate, lightTotalDensity * _LightAbsorption);
 
-
-	float energy = (absorption + in_scattering * phase) * rayDensityIntgral * transmittance;
-	//float shadow = _DarknessThreshold + absorption * (1.0 - _DarknessThreshold);
-
-	return energy;
+	energy.rgb += (absorption * in_scattering * phase);
+	energy.a *= bearNew(cloudDensity * stepThickness * _CloudAbsorption);
 }
 
-
-float calculateLightEnergyMy(in float rayDensityIntgral, in float transmittance, in float lightTotalDensity, in float phase, in float heightRate)
+//from 
+void calculateLightEnergyMy1(inout float4 energy, in float cloudDensity, in float lightTotalDensity, in float phase
+	, in float heightRate, in float stepThickness, in float cosAngle)
 {
-	float absorption = bearNew(lightTotalDensity * _LightAbsorption);
-	float shadow = _DarknessThreshold + absorption * (1.0 - _DarknessThreshold);
+	float d_int = cloudDensity * stepThickness;
+	float view_transmittance = bear(d_int);
 
-	//return shadow * powderEffect(lightTotalDensity) * 2 * phase
-	//	* rayDensityIntgral * transmittance;
+	float light_transmittance = bearNew(lightTotalDensity);
+	float shadow = _DarknessThreshold + light_transmittance * (1.0f - _DarknessThreshold);
 
-	return (shadow + absorption * powderEffect(lightTotalDensity) * 2 * phase)
-		* rayDensityIntgral * transmittance;
+	float3 mult_scattering = 0;
+	if(_MSOctave > 1)
+	{
+	 	mult_scattering = multipleScattering(light_transmittance, cosAngle, cloudDensity, stepThickness, view_transmittance);
+	}
+	else
+	{
+		mult_scattering = _EnergyStrength.y * light_transmittance * phase;
+	}
 
-	//return rayDensityIntgral * transmittance * shadow
-	//	+ rayDensityIntgral
-	//	* transmittance
-	//	* absorption
-	//	* phase
-	//	* powderEffect(lightTotalDensity) * 2
-	//	;
+ 	float3 sun_light = _LightColor0.rgb * mult_scattering* _LightAbsorption
+		* powderEffect(lightTotalDensity, cosAngle) * 2
+		* d_int
+		;
+
+ 	float3 sky_light = unity_AmbientSky.rgb * clamp(heightRate, 0.5, 1.0)
+		* d_int
+		* _EnergyStrength.x;
+	float3 lum = sun_light + sky_light;
+
+	energy.rgb += lum * energy.a * _EnergyStrength.z;
+	energy.a *= view_transmittance;
 }
 
-float calculateLightEnergy(in float rayDensityIntgral, in float transmittance, in float lightTotalDensity, in float phase, in float heightRate)
+//from s2016-pbs-frostbite-sky-clouds-new.pdf
+void calculateLightEnergyFrostbite(inout float4 energy, in float cloudDensity, in float lightTotalDensity, in float phase
+	, in float heightRate, in float stepThickness, in float cosAngle)
 {
-	//return 2 * bear(lightTotalDensity) * powderEffect(lightTotalDensity) * rayDensityIntgral * transmittance;
-	return calculateLightEnergyMy(rayDensityIntgral, transmittance, lightTotalDensity, phase, heightRate);
-	//return calculateLightEnergyHZ(rayDensityIntgral, transmittance, lightTotalDensity, phase, heightRate);
+	//总消光系数σe,包含了吸收和外散射, σe = σa + σs_out
+	//吸收会让光子直接消失,外散射会将当前光路上的光子散射到其他光路上去,导致当前光路光子数量减少
+	//内散射系数σs_in,内散射会将其他光路上的光子散射到当前光路上来,导致光子数量增加
+	//因为内散射的本质是来源于外散射,所以外散射强度跟内散射有一个f(x)的关系
+	//云的反照率albedo = σs / (σa + σs)
+
+	//float sigmaA = _CloudAbsorption;
+	const float sigmaA = 0;
+	float sigmaS = cloudDensity;
+	float sigmaE = max(sigmaA + sigmaS, 0.0000001);
+
+	float d_int = cloudDensity * stepThickness;
+	float transmittance = bear(sigmaE * stepThickness);
+
+	float absorption = bear(lightTotalDensity);
+	float shadow = _DarknessThreshold + absorption * (1.0f - _DarknessThreshold);
+
+	float3 mult_scattering = multipleScattering(absorption, cosAngle, cloudDensity, stepThickness, sigmaE);
+
+ 	float3 sun_light = _LightColor0.rgb * mult_scattering 
+		//* powderEffect(lightTotalDensity, cosAngle) * 2
+		//* d_int
+		;
+
+ 	float3 sky_light = (unity_AmbientSky.rgb * heightRate)
+		//* d_int
+		* _EnergyStrength.x;
+
+	float3 lum = sun_light + sky_light;
+	lum = (lum - lum * transmittance) / sigmaE;
+
+	energy.rgb += lum * energy.a * _EnergyStrength.z;
+	energy.a *= transmittance;
+}
+
+void calculateLightEnergy(inout float4 energy, in float cloudDensity, in float lightTotalDensity, in float phase
+	, in float heightRate, in float stepThickness, in float cosAngle)
+{
+	calculateLightEnergyMy1(energy, cloudDensity, lightTotalDensity, phase, heightRate, stepThickness, cosAngle);
+	//calculateLightEnergyFrostbite(energy, cloudDensity, lightTotalDensity, phase, heightRate, stepThickness, cosAngle);
+	//calculateLightEnergyHZ(energy, cloudDensity, lightTotalDensity, phase, heightRate, stepThickness);
 }
 
 //----------------------------------------------------
 //
 // Cloud Shape
 //
+float2 calculateHeightType(in float type, in float heightRate)
+{
+	return _HeightTypeTex2D.SampleLevel(sampler_HeightTypeTex2D, float2(type, heightRate), 0).rg;
+}
+
 float getHeightFractionForPoint(float3 inPosition, float2 inCloudMinMax)
 {
 	float height_fraction = (inPosition.y - inCloudMinMax.x) / (inCloudMinMax.y - inCloudMinMax.x);
@@ -490,12 +584,12 @@ bool calculateCloudThickness(in float3 rayOrg, in float3 rayDir, out float dst_t
 	return true;
 }
 
-void calculateWeatherAndEdge(in float3 pos, in float heightRate, out float weather, out float edge)
+void calculateWeatherAndEdge(in float3 pos, in float heightRate, out float2 weather, out float edge)
 {
 	if (_DrawAreaIndex == AREA_BOX)
 	{
 		edge = calculateEdgeForBox(pos, _BoxMin, _BoxMax);
-		weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, (pos.xz - _BoxMin.xz) / (_BoxMax.xz - _BoxMin.xz) * _WeatherScale, 0).r;
+		weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, (pos.xz - _BoxMin.xz) / (_BoxMax.xz - _BoxMin.xz) * _WeatherScale, 0).rg;
 	}
 	else
 	{
@@ -504,7 +598,7 @@ void calculateWeatherAndEdge(in float3 pos, in float heightRate, out float weath
 		if (_DrawAreaIndex == AREA_HORIZON_LINE)
 		{
 			uv = (pos.xz * _WeatherScale / (_PlanetData.w + _PlanetCloudThickness.y) * 0.5 + 0.5) + _WeatherOffset;
-			weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, uv , 0).r;
+			weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, uv , 0).rg;
 		}
 		else
 		{
@@ -513,7 +607,7 @@ void calculateWeatherAndEdge(in float3 pos, in float heightRate, out float weath
 			float3 back = float3(-1, 0, 0);
 			uv = float2(dot(pos_dir, bottom) * 0.5 + 0.5, dot(pos_dir, back) * 0.5 + 0.5) + _WeatherOffset;
 
-			weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, uv, 0).r;
+			weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, uv, 0).rg;
 		}
 	}
 }

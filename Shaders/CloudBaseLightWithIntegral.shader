@@ -115,7 +115,7 @@
 				float final_light = 0;
 
 				float cos_angle = dot(rayDir, lightDir);
-				float phase = phaseFunc(cos_angle, _EnergyParams);
+				float phase = phaseFunc(cos_angle, _PhaseParams);
 
 				while (total_thickness < cloud_thickness)
 				{
@@ -183,7 +183,7 @@
 				float forwardScattering = saturate(dot(ray_dir, light_dir));//abs!!
 
 				float3 col = tex2D(_ScreenTex, i.uv);
-				float3 cloud_col = lerp(_CloudColorBlack.rgb, _CloudColorLight.rgb, col_params.x * _Brightness);
+				float3 cloud_col = lerp(_CloudColorBlack.rgb, _CloudColorLight.rgb, col_params.x * _EnergyStrength.z);
 
 				col = col * col_params.y
 					+ (1 - col_params.y) * cloud_col * _LightColor0

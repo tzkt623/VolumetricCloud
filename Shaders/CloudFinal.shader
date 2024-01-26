@@ -33,10 +33,12 @@
 				float3 viewDir : TEXCOORD1;
 			};
 
+			float3 _VFog;
+
 			float heightFunc(in float heightRate)
 			{
-				float result = saturate(remap(heightRate, 0.0, 0.15, 0, 1));//round bottom;
-				result *= saturate(remap(heightRate, 0.1, 1, 1, 0));//round top
+				float result = saturate(remap(heightRate, 0.0, 0.07, 0.0, 1.0));//round bottom;
+				result *= saturate(remap(heightRate, 0.1, 1.0, 1.0, 0.0));//round top
 
 				//make anvil
 				result = pow(result, saturate(remap(heightRate, 0.65, 0.95, 1, 1 - _AnvilRate * _CoverageRate)));
@@ -54,7 +56,7 @@
 				return result * density * 2;
 			}
 
-			float calculateDetailDensity(in float3 pos, in float heightRate, in float shapeDensity)
+			float calculateDetailDensity(in float3 pos, in float heightRate, in float shapeDensity, in float erosion)
 			{
 				float time = _Time.x;
 				//detail
@@ -62,34 +64,50 @@
 				float high_freq_fbm = dot(detail.rgb, FBM_FACTOR);
 				float high_freq_fbm_rate = lerp(high_freq_fbm, 1 - high_freq_fbm, saturate(heightRate * 5));
 
+				//because detail.rgb = [0, 1], so dot(detail.rgb, FBM_FACTOR) = [0, 1]
 				//because remap range is [0, 1] and high_freq_fbm_rate range is [0, 1]
 				//So DETAIL_DENSITY_SCALE range must in [0, 1]
-				float final = remap(shapeDensity, high_freq_fbm_rate * DETAIL_DENSITY_SCALE, 1.0, 0.0, 1.0);
+				float final = remap(shapeDensity, high_freq_fbm_rate * DETAIL_DENSITY_SCALE * (1 - erosion), 1.0, 0.0, 1.0);
 				return final;
 			}
 
 			float calculateShapeDensity(in float3 pos, in float heightRate, bool sampleDetail)
 			{
 				float edge = 1;
-				float weather = 1;
+				float2 weather = 1;
 
 				calculateWeatherAndEdge(pos, heightRate, weather, edge);
-				//if (weather <= 0)
-				//{
-				//	return 0;
-				//}
+				if (weather.r <= 0)
+				{
+					return 0;
+				}
 
-				float4 noise = _ShapeTex3D.SampleLevel(sampler_ShapeTex3D, float3(pos.x * SHAPE_SCALE, pos.y * SHAPE_SCALE/*heightRate*/, pos.z * SHAPE_SCALE) + _CloudOffset, 0);
-				float fbm = dot(noise.gba, FBM_FACTOR);
+				pos = pos + _WindDirection * heightRate;
+
+				float2 height_type = calculateHeightType(weather.g + 0.4, heightRate);
+
+				float4 noise = _ShapeTex3D.SampleLevel(sampler_ShapeTex3D, float3(pos.x * SHAPE_SCALE, pos.y * SHAPE_SCALE/*heightRate*/, pos.z * SHAPE_SCALE) + _CloudOffset, 0)
+					* height_type.r
+					;
+				if(noise.r <= 0)
+				{
+					return 0;
+				}
+				
+
+				float fbm = dot(noise.gba, FBM_FACTOR);//range=[0, 1]
 				float shape = saturate(remap(noise.r, fbm - 1, 1.0, 0.0, 1.0));
+				//shape *= height_type.r;
+				//shape *= heightFunc(heightRate);
 
 				//shape *= heightFunc(heightRate);
 				//shape *= densityFunc(heightRate);
-				//shape *= getCloudDatas(heightRate, 1.0) / heightRate;
+				//shape *= getCloudDatas(heightRate, weather.g);
 
-				float cloud_coverage = weather * _CoverageRate;
-				float shape_with_coverage = saturate(remap(shape * heightFunc(heightRate), 1 - cloud_coverage, 1.0, 0.0, 1.0));
-				shape_with_coverage *= densityFunc(heightRate, shape);
+				float cloud_coverage = weather.r * _CoverageRate;
+				float shape_with_coverage = saturate(remap(shape, 1 - cloud_coverage, 1.0, 0.0, 1.0));
+				shape_with_coverage *= cloud_coverage;
+				//shape_with_coverage *= densityFunc(heightRate, shape);
 
 				//final must in range [0, 1]
 				//So SHAPE_DENSITY_SCALE = [0, 1]
@@ -97,27 +115,30 @@
 
 				if (sampleDetail && final > 0.0f && _DetailDensityStrength > 0.0f)
 				{
-					return calculateDetailDensity(pos, heightRate, final);
+					return calculateDetailDensity(pos, heightRate, final, height_type.g) * _DensityScale;
 				}
 
-				return final;
+				return final * _DensityScale;
 			}
 
 			float calculateLightDensity(float3 beginPos, in float3 lightDir)
 			{
 				float total_density = 0;
+				float density;
 				for (int i = 0; i < 4; i++)
 				{
-					beginPos += lightDir * _LightStepLength;
+					beginPos += lightDir * _LightStepLength * (i + 1);
 					float height_rate = calculateHeightRate(beginPos);
-					float density = calculateShapeDensity(beginPos, height_rate, true);
-					total_density += max(0.0, density * _LightStepLength);
+					if(height_rate <= 1)
+					{
+						density = calculateShapeDensity(beginPos, height_rate, false);
+						total_density += max(0.0, density);
+					}
 				}
 
-				return total_density;
+				return saturate(total_density) * _LightStepLength;
 			}
 
-			//return xyz=LightEnergy w=Transmittance
 			float4 calculateFinalColor(in float3 rayOrg, in float3 rayDir, in float3 lightDir, in float depth, in float2 uv)
 			{
 				float dst_to_begin_pos;
@@ -131,35 +152,40 @@
 				float random_offset = 0;
 				if (_BlueNoiseIntensity > 0)
 				{
-					random_offset = _BlueNoiseTex2D.SampleLevel(sampler_BlueNoiseTex2D, squareUV(uv * 4), 0) * _BlueNoiseIntensity;
+					random_offset = _BlueNoiseTex2D.SampleLevel(sampler_BlueNoiseTex2D, squareUV(uv), 0);
+					//random_offset = frac(random_offset + float(_Time.x % 32) * 1.61803398875);
+					random_offset *= _BlueNoiseIntensity;
 				}
 
 				float step_thickness = _ShapeStepLength;
+				//float step_thickness = cloud_thickness / _StepCount;
 				float3 step_dir_length = rayDir * step_thickness;
 
 				float cos_angle = dot(rayDir, lightDir);
-				float phase = phaseFunc(cos_angle, _EnergyParams);
+				float phase = phaseFunc(cos_angle, _PhaseParams);
+				//phase = max(phase, _PhaseParams.w);
 
-				float transmittance = 1.0;
-				float3 final_light = 0.0;
+				float fog_phase = hgFunc(cos_angle, _PhaseParams.y);
+				int fog_step_count = 0;
+
+				float4 final_light = float4(0.0, 0.0, 0.0, 1.0);
 				int zero_count = 0;
-				float total_density = 0;
 				bool impact_cloud = false;
 
-				float total_thickness = step_thickness + random_offset;
-				float3 begin_pos = rayOrg + rayDir * (dst_to_begin_pos + random_offset);
-				//begin_pos += step_dir_length;
+				float total_thickness = step_thickness * random_offset;
+				float3 begin_pos = rayOrg + rayDir * dst_to_begin_pos;
+				begin_pos += step_thickness * random_offset;
 
 				//float light_step_length = cloud_thickness * 0.5f / 6;
 
+
 				while (total_thickness < cloud_thickness)
-				//for (int i = 0; i < stepCount; i++)
+				//for (int i = 0; i < _StepCount; i++)
 				{
 					if (total_thickness + dst_to_begin_pos > depth)
 					{
 						break;
 					}
-
 
 					float height_rate = calculateHeightRate(begin_pos);
 					if (impact_cloud)
@@ -174,42 +200,40 @@
 
 							total_thickness += 2 * step_thickness;
 							begin_pos += 2 * step_dir_length;
+
+							_VFog += fog_phase;
 						}
 						else
 						{
-							float density_intgral = density * step_thickness;
-							total_density += density_intgral;
-
 							float light_total_density = calculateLightDensity(begin_pos, lightDir);
-							final_light += calculateLightEnergy(density_intgral
-								, transmittance
+							calculateLightEnergy(final_light
+								, density
 								, light_total_density
 								, phase
-								, height_rate) * _CloudColorLight.rgb;
+								, height_rate
+								, step_thickness
+								, cos_angle);
 
-							transmittance *= bear(density_intgral * _CloudAbsorption);
-
-							//提前退出
-							if (transmittance <= 0.01f)
+							//transmittance
+							if (final_light.a <= 0.01f)
 							{
+								final_light.a = 0;
 								break;
 							}
-
-							//if (total_density >= 1.0)
-							//{
-							//	break;
-							//}
 
 							zero_count = 0;
 							total_thickness += step_thickness;
 							begin_pos += step_dir_length;
+
+							_VFog += fog_phase * density;
 						}
 
-
-							//pre_density = density;
-						}
+						//fog_step_count++;
+						//pre_density = density;
+					}
 					else
 					{
+
 						float test_density = calculateShapeDensity(begin_pos, height_rate, false);
 
 						if (test_density > 0.0f)
@@ -238,8 +262,7 @@
 					}
 				}
 
-				float trnsmission = bear(total_density * _CloudAbsorption);
-				return float4(final_light * _Brightness, transmittance);
+				return float4(final_light.rgb, final_light.a);
 			}
 
 			v2f vert(appdata v)
@@ -262,16 +285,17 @@
 
 				float4 col_params = calculateFinalColor(ray_o, ray_dir, light_dir, linear_eye_depth, i.uv);
 
-				float forwardScattering = saturate(dot(ray_dir, light_dir));//abs!!
-
 				float3 col = tex2D(_ScreenTex, i.uv);
 				float3 cloud_col = col_params.rgb * _LightColor0
-					//+ (col_params.rgb * _CloudColorLight.rgb) * (1 - col_params.a)
-					//+ col_params.x * col * (1 - col_params.y) * saturate(linear_eye_depth / _ProjectionParams.z) * 0.01
+					//+ (col_params.rgb * unity_AmbientSky.rgb)
 					;
+
+				//cloud_col = lerp(_VFog, cloud_col,  col_params.rgb);
+				//cloud_col = mix(cloud_col, col, pow(_VFog, .7));
 
 				col = col * col_params.a
 					+ cloud_col
+					//+ _VFog * col_params.a
 					;
 				//+ (1 - col_params.y) * forwardScattering * _ForwardScatteringScale;
 

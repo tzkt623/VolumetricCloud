@@ -1,0 +1,130 @@
+#pragma kernel main2D
+
+#include "../Head/PerlinNoise.cginc"
+#include "../Head/WorleyNoise.cginc"
+#include "../Head/Function.cginc"
+
+RWTexture2D<float4> outWeatherTex2D;
+StructuredBuffer<int2> inCvgMapWLMarkPoints;
+
+int inResolution;
+float inThreshold;
+//---------------------------------
+//
+//  perlin Worley
+//
+bool inCvgMapWLFlip;
+int inCvgMapWLGridCount;
+float inCvgMapWLFrequency;
+
+//---------------------------------
+//
+//  perlin Perlin
+//
+int inCvgMapPLOctave;
+float inCvgMapPLFrequency;
+float inCvgMapPLLacunarity;
+float inCvgMapPLPersistence;
+float2 inCvgMapPLOffset;
+
+
+//---------------------------------
+//
+//  TypeMap
+//
+int inTypeIndexMapPLOctave;
+float inTypeIndexMapPLFrequency;
+float inTypeIndexMapPLLacunarity;
+float inTypeIndexMapPLPersistence;
+float2 inTypeIndexMapPLOffset;
+
+float calculateCvgWLMap(in StructuredBuffer<int2> samplePoints
+	, float2 pos, float freq, int octave, int gridCount, bool flip)
+{
+	float grid_rate = 1.0f / gridCount;
+	int grid_length = inResolution / gridCount;
+
+	float strength = 1.0f;
+	float sum_strength = 0;
+	float noise = 0;
+
+	for (int o = 0; o < octave; o++)
+	{
+		noise += getNoiseF(samplePoints, inResolution
+			, pos * freq
+			, gridCount, grid_length, grid_rate) * strength;
+
+
+		sum_strength += strength;
+		freq *= 2.0f;
+		strength *= 0.5f;
+	}
+
+	noise /= sum_strength;
+
+	if (flip)
+	{
+		return 1 - noise;
+	}
+
+	return noise;
+}
+float calculateCvgPLMap(in float2 pos)
+{
+	float freq = floor(inCvgMapPLFrequency);
+	float strength = 1.0f;
+	float sum_strength = 0;
+	float noise = 0;
+
+	for (int o = 0; o < inCvgMapPLOctave; o++)
+	{
+		noise += pn2D(pos * freq + inCvgMapPLOffset, freq) * strength;
+		sum_strength += strength;
+
+		freq *= inCvgMapPLLacunarity;
+		strength *= inCvgMapPLPersistence;
+	}
+
+	noise /= sum_strength;
+	noise = noise * 0.5f + 0.5f;
+
+    return noise;
+}
+
+float calculateTypeMap(in float2 pos)
+{
+	float freq = floor(inTypeIndexMapPLFrequency);
+	float strength = 1.0f;
+	float sum_strength = 0;
+	float noise = 0;
+
+	for (int o = 0; o < inTypeIndexMapPLOctave; o++)
+	{
+		noise += pn2D(pos * freq + inTypeIndexMapPLOffset, freq) * strength;
+		sum_strength += strength;
+
+		freq *= inTypeIndexMapPLLacunarity;
+		strength *= inTypeIndexMapPLPersistence;
+	}
+
+	noise /= sum_strength;
+	noise = noise * 0.5f + 0.5f;
+
+    return noise;
+}
+
+[numthreads(8, 8, 1)]
+void main2D(uint3 id : SV_DispatchThreadID)
+{
+    float2 pos = float2(id.x / (float)inResolution, id.y / (float)inResolution);
+
+    float perlin = calculateCvgPLMap(pos);
+	float worley = calculateCvgWLMap(inCvgMapWLMarkPoints, pos, inCvgMapWLFrequency, 3, inCvgMapWLGridCount, inCvgMapWLFlip);
+
+	float noise = worley + perlin * (1 - worley);
+    noise = remap(noise, inThreshold, 1.0, 0.0, 1.0);
+
+    float TypeMap = calculateTypeMap(pos);
+
+    outWeatherTex2D[id.xy] = float4(noise, TypeMap, 0.0f, 0.0f);
+}

@@ -1,68 +1,30 @@
-﻿#pragma kernel main2D
-#pragma kernel main3D
+﻿#pragma kernel main3D
 
 #include "../Head/PerlinNoise.cginc"
 #include "../Head/WorleyNoise.cginc"
 #include "../Head/Function.cginc"
 
-
-RWTexture2D<float4> outTex2D;
 RWTexture3D<float4> outShapeTex3D;
 RWTexture3D<float> outShapePerlinNoiseTex3D;
 
-StructuredBuffer<int2> inMarkPos2D;
-StructuredBuffer<int3> inSamplePoint3D0;
-StructuredBuffer<int3> inSamplePoint3D1;
-StructuredBuffer<int3> inSamplePoint3D2;
-StructuredBuffer<int3> inSamplePoint3D3;
-
-int inGridCountArray[4];
-int inGridLengthArray[4];
-float inGridRateArray[4];
+StructuredBuffer<int3> inCloudWLMarkPoints3D0;
+StructuredBuffer<int3> inCloudWLMarkPoints3D1;
+StructuredBuffer<int3> inCloudWLMarkPoints3D2;
+StructuredBuffer<int3> inCloudWLMarkPoints3D3;
+StructuredBuffer<int> inCloudWLGroupGridCount;
 
 int inResolution;
 
-int inOctave;
-float inFrequency;
-float inLacunarity;
-float inPersistence;
+int inCloudPLOctave;
+float inCloudPLFrequency;
+float inCloudPLLacunarity;
+float inCloudPLPersistence;
+float3 inCloudPLOffset;
 
-float3 inOffset;
-bool inFlip;
-int inDimension;
 
-[numthreads(8, 8, 1)]
-void main2D(uint3 id : SV_DispatchThreadID)
-{
-	float2 pos = float2(id.x / (float)inResolution - 0.5f, id.y / (float)inResolution - 0.5f);
-
-	float freq = inFrequency;
-	float strength = 1.0f;
-	float sum_strength = strength;
-
-	float noise = getNoiseF(inMarkPos2D, inResolution
-		, pos * freq + float2(inOffset.x, inOffset.y)
-		, inGridCountArray[0], inGridLengthArray[0], inGridRateArray[0]);
-
-	for (int o = 1; o < inOctave; o++)
-	{
-		freq *= inLacunarity;
-		strength *= inPersistence;
-		sum_strength += strength;
-		noise += getNoiseF(inMarkPos2D, inResolution
-			, pos * freq + float2(inOffset.x, inOffset.y)
-			, inGridCountArray[0], inGridLengthArray[0], inGridRateArray[0]) * strength;
-	}
-
-	noise /= sum_strength;
-
-	if (inFlip)
-	{
-		noise = 1.0f - noise;
-	}
-
-	outTex2D[id.xy] = float4(noise, noise, noise, 1.0f);
-}
+bool inCloudWLFlip;
+float inCloudWLFrequency;
+float3 inCloudWLOffset;
 
 float calculateWorleyNoise(in StructuredBuffer<int3> samplePoints
 	, float3 pos, float freq, int octave, int gridCount)
@@ -77,18 +39,17 @@ float calculateWorleyNoise(in StructuredBuffer<int3> samplePoints
 	for (int o = 0; o < octave; o++)
 	{
 		noise += getNoiseF(samplePoints, inResolution
-			, pos * freq + inOffset
+			, pos * freq + inCloudWLOffset
 			, gridCount, grid_length, grid_rate) * strength;
-
 
 		sum_strength += strength;
 		freq *= 2.0f;
-		strength *= 0.6f;
+		strength *= 0.5f;
 	}
 
 	noise /= sum_strength;
 
-	if (inFlip)
+	if (inCloudWLFlip)
 	{
 		return 1 - noise;
 	}
@@ -98,18 +59,18 @@ float calculateWorleyNoise(in StructuredBuffer<int3> samplePoints
 
 float calculatePerlinNoise(in float3 pos)
 {
-	float freq = floor(inFrequency);
+	float freq = floor(inCloudPLFrequency);
 	float strength = 1.0f;
 	float sum_strength = 0;
 	float noise = 0;
-	for (int o = 0; o < inOctave; o++)
+	for (int o = 0; o < inCloudPLOctave; o++)
 	{
-		noise += pn3D(pos * freq, freq) * strength;
+		noise += pn3D(pos * freq + inCloudPLOffset, freq) * strength;
 		//noise += pnoise(pos * freq, freq) * strength;
 		sum_strength += strength;
 
-		freq *= inLacunarity;
-		strength *= inPersistence;
+		freq *= inCloudPLLacunarity;
+		strength *= inCloudPLPersistence;
 	}
 
 	noise /= sum_strength;
@@ -123,21 +84,21 @@ void main3D(uint3 id : SV_DispatchThreadID)
 {
 	float3 pos = id / (float)inResolution;
 
-	float worley00 = calculateWorleyNoise(inSamplePoint3D0
-		, pos, 1, 3
-		, 4);
+	float worley00 = calculateWorleyNoise(inCloudWLMarkPoints3D0
+		, pos, inCloudWLFrequency, 1
+		, inCloudWLGroupGridCount[0]);
 
-	float worley01 = calculateWorleyNoise(inSamplePoint3D1
-		, pos, 1, 3
-		, 8);
+	float worley01 = calculateWorleyNoise(inCloudWLMarkPoints3D1
+		, pos, inCloudWLFrequency, 1
+		, inCloudWLGroupGridCount[1]);
 
-	float worley02 = calculateWorleyNoise(inSamplePoint3D2
-		, pos, 1, 3
-		, 16);
+	float worley02 = calculateWorleyNoise(inCloudWLMarkPoints3D2
+		, pos, inCloudWLFrequency, 1
+		, inCloudWLGroupGridCount[2]);
 
-	float worley03 = calculateWorleyNoise(inSamplePoint3D3
-		, pos, 1, 3
-		, 32);
+	float worley03 = calculateWorleyNoise(inCloudWLMarkPoints3D3
+		, pos, inCloudWLFrequency, 1
+		, inCloudWLGroupGridCount[3]);
 
 	float perlin = calculatePerlinNoise(pos);
 	perlin = smoothstep(0.0, 1.0, perlin);
@@ -146,6 +107,6 @@ void main3D(uint3 id : SV_DispatchThreadID)
 	//float perlin_worley = remap(perlin, worley00, 1.0f, 0.0f, 1.0f);
 	//float perlin_worley = worley00 - perlin * (1 - worley00);
 
-	outShapeTex3D[id] = float4(perlin_worley * perlin_worley, worley01, worley02, worley03);
+	outShapeTex3D[id] = float4(perlin_worley, worley01, worley02, worley03);
 	outShapePerlinNoiseTex3D[id] = perlin;
 }

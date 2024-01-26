@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
 namespace tezcat.Framework.Exp
@@ -15,16 +16,6 @@ namespace tezcat.Framework.Exp
             Box,
             Planet,
             HorizonLine
-        }
-
-        public enum ShaderIndex
-        {
-            Error = 0,
-            Level01,
-            Level02,
-            Level03,
-            Level04,
-            Level05,
         }
 
         public enum CameraPos
@@ -46,97 +37,36 @@ namespace tezcat.Framework.Exp
         public BoxCloud mBoxCloud;
         public PlanetCloud mPlanetCloud;
         public HorizonLineCloud mHorizonLineCloud;
+        [Header("Draw Area")]
         public CloudArea mDrawArea;
 
-        [Header("Shape")]
-        public CloudNoiseGPU mWorleyNoise;
-        public DetailNoise mDetailNoise;
-
-        [Min(10)]
-        public float mStepCount = 50;
-        [Min(1)]
-        public float mShapeStepLength = 50;
-        [Min(0.0f)]
-        public float mShapeScale = 0.1f;
-        [Min(0.0f)]
-        public float mShapeDensityStrength = 1.0f;
-        [Min(0.0f)]
-        public float mDetailScale = 0.1f;
-        [Min(0.0f)]
-        public float mDetailDensityStrength = 1.0f;
-        [Range(0.0f, 1.0f)]
-        public float mDensityThreshold = 0.0f;
-
-        [Header("Weather")]
-        public Texture2D mWeatherTexture2D;
-        [Range(0.0f, 1.0f)]
-        public float mCoverageRate = 1.0f;
-        [Range(0.0f, 1.0f)]
-        public float mAnvilRate = 0.0f;
-        [Min(0.0001f)]
-        public float mWeatherScale = 0.0f;
-
-        [Header("Lighting")]
-        [Min(0.0f)]
-        public float mLightStepLength = 10;
-
-        public Color mCloudColorLight;
-        public Color mCloudColorBlack;
-        [Range(0.0f, 1.0f)]
-        public float mDarknessThreshold = 0.5f;
-        [Min(0.0f)]
-        public float mCloudAbsorption = 1;
-        [Min(0.0f)]
-        public float mLightAbsorption = 0.5f;
-        [Min(0.0f)]
-        public float mBrightness = 1.0f;
-        [Min(0.0f)]
-        public float mForwardScattering;
-        [Tooltip("For Phase Function")]
-        public Vector4 mEneryParams;
-
-        [Header("Motion")]
-        public Vector3 mCloudOffset;
-        public Vector3 mCloudSpeed;
-        [Space()]
-        public Vector2 mWeatherOffset;
-        public Vector2 mWeatherSpeed;
-        [Space()]
-        public Vector3 mShapeSpeedScale;
-        public Vector3 mDetailSpeedScale;
-
-        [Header("Filter")]
-        public Texture2D mBlueNoise;
-        [Min(0.0f)]
-        public float mBlueNoiseIntensity;
-
-        [Header("BilateralBlur")]
-        public bool mEnableBilateralBlur;
-        public Shader mBlurShader;
-        [Tooltip("x:SpatialWeight y:TonalWeight z:BlurRadius")]
-        public Vector3 mBlurParams;
-
+        public ShapeData mShapeData;
+        public WeatherMapData mWeatherMapData;
+        public LightingData mLightingData;
+        public MotionData mMotionData;
+        public FilterData mFilterData;
+        public BlurData mBlurData;
 
         RenderTexture mShapeTexture;
         RenderTexture mDetailTexture;
         Material mMaterial = null;
-        Material mBlurMaterial = null;
 
-        RenderTexture mBlurRenderTexture;
 
         void Start()
         {
-            if (mWorleyNoise.shapeTexture != null)
+            if (mShapeData.mWorleyNoise.shapeTexture != null)
             {
-                this.onShapeTextureCreated(mWorleyNoise.shapeTexture);
+                this.onShapeTextureCreated(mShapeData.mWorleyNoise.shapeTexture);
             }
-            mWorleyNoise.onTextureCreated += onShapeTextureCreated;
+            mShapeData.mWorleyNoise.onTextureCreated += onShapeTextureCreated;
 
-            if (mDetailNoise.renderTexture != null)
+            if (mShapeData.mDetailNoise.renderTexture != null)
             {
-                this.onDetailTextureCreated(mDetailNoise.renderTexture);
+                this.onDetailTextureCreated(mShapeData.mDetailNoise.renderTexture);
             }
-            mDetailNoise.onTextureCreated += onDetailTextureCreated;
+            mShapeData.mDetailNoise.onTextureCreated += onDetailTextureCreated;
+
+            mWeatherMapData.init();
         }
 
         private void onShapeTextureCreated(RenderTexture obj)
@@ -206,62 +136,36 @@ namespace tezcat.Framework.Exp
             mMaterial.SetTexture("_ScreenTex", source);
             mMaterial.SetTexture("_ShapeTex3D", mShapeTexture);
             mMaterial.SetTexture("_DetailTex3D", mDetailTexture);
-            mMaterial.SetTexture("_WeatherTex2D", mWeatherTexture2D);
 
             //-----------------------------------
             //
             //  Shape
             //
-            mMaterial.SetFloat("_StepCount", mStepCount);
-            mMaterial.SetFloat("_ShapeStepLength", mShapeStepLength);
-            mMaterial.SetFloat("_ShapeScale", mShapeScale * 0.00001f);
-            mMaterial.SetFloat("_DetailScale", mDetailScale * 0.00001f);
-
-            const float modifier = 1000.0f;
-            mShapeDensityStrength = Mathf.Min(mShapeDensityStrength, modifier);
-            mDetailDensityStrength = Mathf.Min(mDetailDensityStrength, modifier);
-            mMaterial.SetFloat("_ShapeDensityStrength", mShapeDensityStrength / modifier);
-            mMaterial.SetFloat("_DetailDensityStrength", mDetailDensityStrength / modifier);
+            mShapeData.sendToGPU(mMaterial);
 
             //-----------------------------------
             //
             //  Weather
             //
-            mMaterial.SetFloat("_CoverageRate", mCoverageRate);
-            mMaterial.SetVector("_WeatherOffset", mWeatherOffset);
-            mMaterial.SetFloat("_AnvilRate", mAnvilRate);
-            mMaterial.SetFloat("_WeatherScale", mWeatherScale);
+            mWeatherMapData.sendToGPU(mMaterial);
 
             //-----------------------------------
             //
             //  Light
             //
-            mMaterial.SetFloat("_LightStepLength", mLightStepLength);
-            mMaterial.SetColor("_CloudColorLight", mCloudColorLight);
-            mMaterial.SetColor("_CloudColorBlack", mCloudColorBlack);
-            mMaterial.SetFloat("_CloudAbsorption", mCloudAbsorption);
-            mMaterial.SetFloat("_ForwardScatteringScale", mForwardScattering);
-            mMaterial.SetFloat("_DensityThreshold", mDensityThreshold);
-            mMaterial.SetFloat("_DarknessThreshold", mDarknessThreshold);
-            mMaterial.SetFloat("_LightAbsorption", mLightAbsorption);
-            mMaterial.SetVector("_EnergyParams", mEneryParams);
-            mMaterial.SetFloat("_Brightness", mBrightness);
+            mLightingData.sendToGPU(mMaterial);
 
             //-----------------------------------
             //
             //  Motion
             //
-            mMaterial.SetVector("_CloudOffset", mCloudOffset);
-            mMaterial.SetVector("_CloudSpeed", mCloudSpeed);
-            mMaterial.SetVector("_ShapeSpeedScale", mShapeSpeedScale);
-            mMaterial.SetVector("_DetailSpeedScale", mDetailSpeedScale);
+            mMotionData.sendToGPU(mMaterial);
 
             //------------------------------------
             //
             //  Filter
             //
-            mMaterial.SetTexture("_BlueNoiseTex2D", mBlueNoise);
-            mMaterial.SetFloat("_BlueNoiseIntensity", mBlueNoiseIntensity);
+            mFilterData.sendToGPU(mMaterial);
 
             //------------------------------------
             //
@@ -298,18 +202,9 @@ namespace tezcat.Framework.Exp
             //var full_resolution = Screen.currentResolution;
             //Screen.SetResolution(full_resolution.width / 2, full_resolution.height / 2, true);
 
-            if (mEnableBilateralBlur)
+            if (mBlurData.mEnableBilateralBlur)
             {
-                if (mBlurMaterial == null)
-                {
-                    mBlurMaterial = new Material(mBlurShader);
-                    mBlurRenderTexture = new RenderTexture(source);
-                    mBlurRenderTexture.Create();
-                }
-                Graphics.Blit(source, mBlurRenderTexture, mMaterial);
-                mBlurMaterial.SetTexture("_MainTex", mBlurRenderTexture);
-                mBlurMaterial.SetVector("_BlurParams", mBlurParams);
-                Graphics.Blit(mBlurRenderTexture, destination, mBlurMaterial);
+                mBlurData.sendToGPU(mMaterial, source, destination);
             }
             else
             {
@@ -321,10 +216,11 @@ namespace tezcat.Framework.Exp
 
         private void OnDestroy()
         {
-            mWorleyNoise.onTextureCreated -= this.onShapeTextureCreated;
-            mDetailNoise.onTextureCreated -= this.onDetailTextureCreated;
+            mShapeData.mWorleyNoise.onTextureCreated -= this.onShapeTextureCreated;
+            mShapeData.mDetailNoise.onTextureCreated -= this.onDetailTextureCreated;
 
-            mBlurRenderTexture?.Release();
+            mBlurData?.close();
+
             mShapeTexture?.Release();
             mDetailTexture?.Release();
         }
@@ -368,43 +264,7 @@ namespace tezcat.Framework.Exp
         // Update is called once per frame
         void Update()
         {
-            mWeatherOffset += mWeatherSpeed * Time.deltaTime;
-
-            if (this.mDrawArea == CloudArea.Planet)
-            {
-                if (mCloudOffset.x > 360.0f)
-                {
-                    mCloudOffset.x -= 360.0f;
-                }
-                else if (mCloudOffset.x < 0.0f)
-                {
-                    mCloudOffset.x += 360.0f;
-                }
-
-                if (mCloudOffset.y > 360.0f)
-                {
-                    mCloudOffset.y -= 360.0f;
-                }
-                else if (mCloudOffset.y < 0.0f)
-                {
-                    mCloudOffset.y += 360.0f;
-                }
-
-                if (mCloudOffset.z > 360.0f)
-                {
-                    mCloudOffset.z -= 360.0f;
-                }
-                else if (mCloudOffset.z < 0.0f)
-                {
-                    mCloudOffset.z += 360.0f;
-                }
-
-                mCloudOffset += new Vector3(mCloudSpeed.z, mCloudSpeed.x, mCloudSpeed.y);
-            }
-            else
-            {
-                mCloudOffset += mCloudSpeed * Time.deltaTime;
-            }
+            mMotionData.update(mDrawArea);
 
 
             //Debug.Log(mBoxCollider.bounds.min);
