@@ -1,0 +1,56 @@
+﻿#pragma kernel CSMain
+#pragma kernel CSDebug
+
+#include "../Head/PerlinNoise.cginc"
+#include "../Head/Function.cginc"
+
+RWTexture3D<float> outPerlinNoiseTex3D;
+
+int inPerlinData1[4];
+float4 inPerlinData2;
+
+#define Resolution inPerlinData1[0]
+#define Octave inPerlinData1[1]
+#define Frequency inPerlinData1[2]
+#define Lacunarity inPerlinData1[3]
+#define Persistence inPerlinData2.w
+
+#define Offset inPerlinData2.xyz
+
+float calculatePerlinNoise(in float3 pos)
+{
+    int freq = Frequency;
+    float strength = 1.0f;
+    float sum_strength = 0;
+    float noise = 0;
+    for (int o = 0; o < Octave; o++)
+    {
+        noise += pn3D(pos, freq) * strength;
+        sum_strength += strength;
+        
+        freq *= Lacunarity;
+        strength *= Persistence;
+    }
+
+    noise /= sum_strength;
+    return noise;
+}
+
+[numthreads(8, 8, 2)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    float3 pos = id / (float)Resolution;
+    float perlin = calculatePerlinNoise(pos + Offset);
+    outPerlinNoiseTex3D[id] = pow(perlin, 2.0f);
+}
+
+
+RWStructuredBuffer<int> _DebugOutput;
+[numthreads(4, 1, 1)]
+void CSDebug(uint3 id : SV_DispatchThreadID)
+{
+    if(id.x < 4)
+    {
+        _DebugOutput[id.x] = inPerlinData1[id.x];
+    }
+}

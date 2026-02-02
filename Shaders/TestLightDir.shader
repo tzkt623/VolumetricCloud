@@ -1,4 +1,4 @@
-﻿Shader "Hidden/NewImageEffectShader"
+Shader "Tezcat/TestLightDir"
 {
     Properties
     {
@@ -6,14 +6,16 @@
     }
     SubShader
     {
-        // No culling or depth
-        Cull Off ZWrite Off ZTest Always
+        Tags { "RenderType"="Opaque" }
+        LOD 100
 
         Pass
         {
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            // make fog work
+            #pragma multi_compile_fog
 
             #include "UnityCG.cginc"
 
@@ -27,24 +29,27 @@
             {
                 float2 uv : TEXCOORD0;
                 float4 vertex : SV_POSITION;
+                float3 worldPos : TEXCOORD1;
             };
+
+            sampler2D _MainTex;
+            float4 _MainTex_ST;
 
             v2f vert (appdata v)
             {
                 v2f o;
                 o.vertex = UnityObjectToClipPos(v.vertex);
-                o.uv = v.uv;
+                o.uv = TRANSFORM_TEX(v.uv, _MainTex);
+                o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
                 return o;
             }
 
-            sampler2D _MainTex;
-
-            fixed4 frag (v2f i) : SV_Target
+            float4 frag (v2f i) : SV_Target
             {
-                fixed4 col = tex2D(_MainTex, i.uv);
-                // just invert the colors
-                col.rgb = 1 - col.rgb;
-                return col;
+                // sample the texture
+                float4 col = tex2D(_MainTex, i.uv);
+                float l = dot(_WorldSpaceLightPos0.xyz, normalize(_WorldSpaceCameraPos.xyz - i.worldPos));
+                return float4(l, l, l, 1.0f);
             }
             ENDCG
         }

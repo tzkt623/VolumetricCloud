@@ -1,0 +1,26 @@
+﻿#pragma kernel CSMain
+
+#include "../Head/WorleyNoise.cginc"
+
+RWTexture3D<float4> outWorleyNoiseTex3D;
+
+uint inResolution;
+uint inCellCount;
+float4 inOffset1;
+float4 inPowFactor;
+//float4 inMixFactor;
+
+[numthreads(8, 8, 2)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{ 
+    float v1 = 1 - worlyNoise33(id, inResolution, 16, inOffset1.xyz);
+    //float v2 = fbmWorley(id, inResolution, inCellCount, inOffset1.xyz, inOffset1.w, 3);
+    //float v3 = fbmWorley(id, inResolution, inCellCount * 2, inOffset1.xyz, inOffset1.w, 3);
+    //float v4 = fbmWorley(id, inResolution, inCellCount * 4, inOffset1.xyz, inOffset1.w, 3);
+    
+    float v2 = fbmWorleyGPUPro(id, inResolution, inCellCount, inOffset1.xyz, inPowFactor.xyz);
+    float v3 = fbmWorleyGPUPro(id, inResolution, inCellCount * 2, inOffset1.xyz, inPowFactor.xyz);
+    float v4 = fbmWorleyGPUPro(id, inResolution, inCellCount * 4, inOffset1.xyz, inPowFactor.xyz);
+    
+    outWorleyNoiseTex3D[id] = float4(v1, v2, v3, v4);
+}

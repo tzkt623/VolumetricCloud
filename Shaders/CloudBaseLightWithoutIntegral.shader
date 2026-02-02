@@ -145,7 +145,7 @@
 
 				float forwardScattering = saturate(dot(ray_dir, light_dir));//abs!!
 
-				float3 col = tex2D(_ScreenTex, i.uv);
+				float3 col = tex2D(_MainTex, i.uv);
 				float3 cloud_col = lerp(_CloudColorBlack.rgb, _CloudColorLight.rgb, col_params.x * _EnergyStrength.z);
 
 				col = col * col_params.y

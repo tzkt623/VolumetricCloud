@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace tezcat.Framework.Exp
 {
@@ -52,9 +50,9 @@ namespace tezcat.Framework.Exp
 
         private void drawArea()
         {
-            switch (mRenderer.mDrawArea)
+            switch (mRenderer.mAreaData.mDrawArea)
             {
-                case CloudRenderer.CloudArea.Box:
+                case AreaData.CloudArea.Box:
                     {
                         Gizmos.color = Color.green;
                         Gizmos.DrawWireCube(mBoxCloud.position, mBoxCloud.edgeLength);
@@ -67,7 +65,7 @@ namespace tezcat.Framework.Exp
                         Gizmos.color = Color.white;
                     }
                     break;
-                case CloudRenderer.CloudArea.Planet:
+                case AreaData.CloudArea.Planet:
                     {
                         Gizmos.DrawWireSphere(mPlanetCloud.planetCenter, mPlanetCloud.planetRadius);
                         Gizmos.color = Color.green;
@@ -76,7 +74,7 @@ namespace tezcat.Framework.Exp
                         Gizmos.DrawWireSphere(mPlanetCloud.planetCenter, mPlanetCloud.outerRadius);
                     }
                     break;
-                case CloudRenderer.CloudArea.HorizonLine:
+                case AreaData.CloudArea.HorizonLine:
                     {
                         //Gizmos.DrawCube(mHorizonLineCloud.horizonLinePosition, mHorizonLineCloud.horizonLineSize);
 
@@ -165,15 +163,15 @@ namespace tezcat.Framework.Exp
                         {
                             var ray_dir = Vector3.Normalize(camera_ray_end_pos - camera_pos);
 
-                            switch (mRenderer.mDrawArea)
+                            switch (mRenderer.mAreaData.mDrawArea)
                             {
-                                case CloudRenderer.CloudArea.Box:
+                                case AreaData.CloudArea.Box:
                                     this.drawBox(ref camera_pos, ref ray_dir);
                                     break;
-                                case CloudRenderer.CloudArea.Planet:
+                                case AreaData.CloudArea.Planet:
                                     this.drawSphereArea(mPlanetCloud, ref camera_pos, ref ray_dir);
                                     break;
-                                case CloudRenderer.CloudArea.HorizonLine:
+                                case AreaData.CloudArea.HorizonLine:
                                     this.drawSphereArea(mHorizonLineCloud, ref camera_pos, ref ray_dir);
                                     break;
                                 default:
@@ -217,10 +215,10 @@ namespace tezcat.Framework.Exp
             var view_height = (camera_pos - sphereArea.planetCenter).magnitude;
             if (view_height > sphereArea.outerRadius)
             {
-                var cloud_max = this.raySphereDst(sphereArea.planetCenter, sphereArea.planetRadius + sphereArea.cloudThickness.y, camera_pos, ray_dir);
+                var cloud_max = this.raySphereDst(sphereArea.planetCenter, sphereArea.planetRadius + sphereArea.cloudMinMax.y, camera_pos, ray_dir);
                 if (cloud_max.y > 0)
                 {
-                    var cloud_min = this.raySphereDst(sphereArea.planetCenter, sphereArea.planetRadius + sphereArea.cloudThickness.x, camera_pos, ray_dir);
+                    var cloud_min = this.raySphereDst(sphereArea.planetCenter, sphereArea.planetRadius + sphereArea.cloudMinMax.x, camera_pos, ray_dir);
 
                     begin_pos = camera_pos + ray_dir * cloud_max.x;
                     if (cloud_min.y > 0)
@@ -237,7 +235,7 @@ namespace tezcat.Framework.Exp
             {
                 begin_pos = camera_pos;
 
-                var cloud_min = this.raySphereDst(sphereArea.planetCenter, sphereArea.planetRadius + sphereArea.cloudThickness.x, camera_pos, ray_dir);
+                var cloud_min = this.raySphereDst(sphereArea.planetCenter, sphereArea.planetRadius + sphereArea.cloudMinMax.x, camera_pos, ray_dir);
 
                 if (cloud_min.y > 0)
                 {
@@ -245,17 +243,17 @@ namespace tezcat.Framework.Exp
                 }
                 else
                 {
-                    var cloud_max = this.raySphereDst(sphereArea.planetCenter, sphereArea.planetRadius + sphereArea.cloudThickness.y, camera_pos, ray_dir);
+                    var cloud_max = this.raySphereDst(sphereArea.planetCenter, sphereArea.planetRadius + sphereArea.cloudMinMax.y, camera_pos, ray_dir);
                     end_pos = camera_pos + ray_dir * cloud_max.y;
                 }
 
             }
             else if (view_height > sphereArea.planetRadius)
             {
-                var cloud_min = this.raySphereDst(sphereArea.planetCenter, sphereArea.planetRadius + sphereArea.cloudThickness.x, camera_pos, ray_dir);
+                var cloud_min = this.raySphereDst(sphereArea.planetCenter, sphereArea.planetRadius + sphereArea.cloudMinMax.x, camera_pos, ray_dir);
                 if (cloud_min.y > 0)
                 {
-                    var cloud_max = this.raySphereDst(sphereArea.planetCenter, sphereArea.planetRadius + sphereArea.cloudThickness.y, camera_pos, ray_dir);
+                    var cloud_max = this.raySphereDst(sphereArea.planetCenter, sphereArea.planetRadius + sphereArea.cloudMinMax.y, camera_pos, ray_dir);
 
                     begin_pos = camera_pos + ray_dir * cloud_min.y;
                     end_pos = camera_pos + ray_dir * cloud_max.y;

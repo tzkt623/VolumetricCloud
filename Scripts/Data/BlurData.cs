@@ -13,6 +13,11 @@ namespace tezcat.Framework.Exp
         [Tooltip("x:SpatialWeight y:TonalWeight z:BlurRadius")]
         public Vector3 mBlurParams;
 
+        public override void initIDs()
+        {
+
+        }
+
         public override void sendToGPU(Material material, RenderTexture source, RenderTexture destination)
         {
             if (mBlurMaterial == null)

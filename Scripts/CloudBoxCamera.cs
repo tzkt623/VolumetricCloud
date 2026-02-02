@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace tezcat.Framework.Exp
 {
@@ -8,7 +6,6 @@ namespace tezcat.Framework.Exp
     public class CloudBoxCamera 
         : MonoBehaviour
     {
-
         public CloudRenderer mCloudBox;
 
         void Start()

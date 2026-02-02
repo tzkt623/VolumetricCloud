@@ -34,7 +34,7 @@
 			};
 
 			//return xyz=LightEnergy w=Transmittance
-			float calculateFinalColor(in float3 rayOrg, in float3 rayDir, in float3 lightDir, in float depth, in float2 uv)
+			float2 calculateFinalColor(in float3 rayOrg, in float3 rayDir, in float3 lightDir, in float depth, in float2 uv)
 			{
 				float dst_to_begin_pos;
 				float cloud_thickness;
@@ -54,9 +54,9 @@
 				}
 
 				float step_thickness = cloud_thickness / _StepCount;
-				float total_thickness = random_offset + step_thickness;
+				float total_thickness = step_thickness;
 
-				float3 begin_pos = rayOrg + rayDir * (dst_to_begin_pos + random_offset);
+				float3 begin_pos = rayOrg + rayDir * dst_to_begin_pos;
 				float3 step_dir_length = rayDir * step_thickness;
 
 				float total_density = 0;
@@ -68,7 +68,17 @@
 						break;
 					}
 
-					total_density += 0.01f;
+					float ld = 0;
+					for(int i = 0 ; i < 6; i++)
+					{
+						ld += 0.02f;
+					}
+					float lu = exp(-ld);
+					float density = 0.02f * _ShapeDensityStrength;
+
+					light_total_energy += transmittance * (lu - lu * exp(-density)) / 0.02f;
+
+					transmittance *= exp(-density);
 					if (total_density >= 1)
 					{
 						break;
@@ -77,7 +87,7 @@
 					total_thickness += step_thickness;
 				}
 
-				return total_density * _ShapeDensityStrength;
+				return float2(transmittance, light_total_energy);
 			}
 
 			v2f vert(appdata v)
@@ -85,7 +95,7 @@
 				v2f o;
 				o.vertex = UnityObjectToClipPos(v.vertex);
 				o.uv = v.uv;
-				o.viewDir = calculateViewDir(v.uv);
+				o.viewDir = calculateViewDir3(v.uv);
 				return o;
 			}
 
@@ -98,12 +108,12 @@
 				calulateRayMarchDatas(i.uv, i.viewDir
 					, ray_o, ray_dir, light_dir, linear_eye_depth);
 
-				float col_params = calculateFinalColor(ray_o, ray_dir, light_dir, linear_eye_depth, i.uv);
+				float2 col_params = calculateFinalColor(ray_o, ray_dir, light_dir, linear_eye_depth, i.uv);
 
-				float3 col = tex2D(_ScreenTex, i.uv);
-				float3 cloud_col = _LightColor0 * col_params;
+				float3 col = tex2D(_MainTex, i.uv);
+				float3 cloud_col = _LightColor0 * col_params.y;
 
-				col = col * (1 - col_params) + cloud_col;
+				col = col * (1 - col_params.x) + cloud_col;
 
 				return float4(col, 1);
 			}

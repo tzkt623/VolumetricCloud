@@ -12,6 +12,7 @@
 		Pass
 		{
 			CGPROGRAM
+			#pragma enable_d3d11_debug_symbols
 			#pragma vertex vert
 			#pragma fragment frag
 
@@ -34,14 +35,15 @@
 			};
 
 			float3 _VFog;
+			
 
 			float heightFunc(in float heightRate)
 			{
 				float result = saturate(remap(heightRate, 0.0, 0.07, 0.0, 1.0));//round bottom;
-				result *= saturate(remap(heightRate, 0.1, 1.0, 1.0, 0.0));//round top
+				result *= saturate(remap(heightRate, 0.9, 1.0, 1.0, 0.0));//round top
 
 				//make anvil
-				result = pow(result, saturate(remap(heightRate, 0.65, 0.95, 1, 1 - _AnvilRate * _CoverageRate)));
+				//result = pow(result, saturate(remap(heightRate, 0.65, 0.95, 1, 1 - _AnvilRate * _CoverageRate)));
 
 				return result;
 			}
@@ -51,7 +53,7 @@
 				float result = heightRate * saturate(remap(heightRate, 0.0f, 0.2f, 0.0f, 1.0f));
 				result *= saturate(remap(heightRate, 0.9, 1.0, 1.0, 0.0));
 
-				result *= lerp(1, saturate(remap(pow(heightRate, 0.5), 0.4, 0.95, 1.0, 0.2)), _AnvilRate);
+				//result *= lerp(1, saturate(remap(pow(heightRate, 0.5), 0.4, 0.95, 1.0, 0.2)), _AnvilRate);
 
 				return result * density * 2;
 			}
@@ -60,14 +62,14 @@
 			{
 				float time = _Time.x;
 				//detail
-				float3 detail = _DetailTex3D.SampleLevel(sampler_DetailTex3D, pos * DETAIL_SCALE, 0);
+				float3 detail = _DetailTex3D.SampleLevel(sampler_DetailTex3D, pos * DETAIL_SCALE + DETAIL_OFFSET, 0);
 				float high_freq_fbm = dot(detail.rgb, FBM_FACTOR);
-				float high_freq_fbm_rate = lerp(high_freq_fbm, 1 - high_freq_fbm, saturate(heightRate * 5));
+				float high_freq_fbm_rate = lerp(high_freq_fbm, 1 - high_freq_fbm, saturate(heightRate * 10));
 
 				//because detail.rgb = [0, 1], so dot(detail.rgb, FBM_FACTOR) = [0, 1]
 				//because remap range is [0, 1] and high_freq_fbm_rate range is [0, 1]
 				//So DETAIL_DENSITY_SCALE range must in [0, 1]
-				float final = remap(shapeDensity, high_freq_fbm_rate * DETAIL_DENSITY_SCALE * (1 - erosion), 1.0, 0.0, 1.0);
+				float final = remap(shapeDensity, high_freq_fbm_rate * heightRate, 1.0, 0.0, 1.0);
 				return final;
 			}
 
@@ -77,66 +79,82 @@
 				float2 weather = 1;
 
 				calculateWeatherAndEdge(pos, heightRate, weather, edge);
-				if (weather.r <= 0)
-				{
-					return 0;
-				}
+				//if (weather.r <= 0)
+				//{
+				//	return 0;
+				//}
 
-				pos = pos + _WindDirection * heightRate;
+				//pos = pos + _WindDirection * heightRate;
 
-				float2 height_type = calculateHeightType(weather.g + 0.4, heightRate);
+				float2 height_type = calculateHeightType(weather.g, heightRate);
+				float3 uvw = pos * SHAPE_SCALE;
+				float4 noise = _ShapeTex3D.SampleLevel(sampler_ShapeTex3D, uvw, 0);
 
-				float4 noise = _ShapeTex3D.SampleLevel(sampler_ShapeTex3D, float3(pos.x * SHAPE_SCALE, pos.y * SHAPE_SCALE/*heightRate*/, pos.z * SHAPE_SCALE) + _CloudOffset, 0)
-					* height_type.r
-					;
+				//noise.r *= height_type.r;
 				if(noise.r <= 0)
 				{
 					return 0;
 				}
 				
-
 				float fbm = dot(noise.gba, FBM_FACTOR);//range=[0, 1]
-				float shape = saturate(remap(noise.r, fbm - 1, 1.0, 0.0, 1.0));
+				float shape = remap(noise.r, fbm - 1, 1.0, 0.0, 1.0);
+				shape *= SHAPE_DENSITY_SCALE;
 				//shape *= height_type.r;
-				//shape *= heightFunc(heightRate);
+				//shape *= getCloudDatas(heightRate, weather.g);
 
 				//shape *= heightFunc(heightRate);
 				//shape *= densityFunc(heightRate);
-				//shape *= getCloudDatas(heightRate, weather.g);
 
-				float cloud_coverage = weather.r * _CoverageRate;
-				float shape_with_coverage = saturate(remap(shape, 1 - cloud_coverage, 1.0, 0.0, 1.0));
-				shape_with_coverage *= cloud_coverage;
+				//float cloud_coverage = weather.r;
+				//float shape_with_coverage = remap(shape, cloud_coverage, 1.0, 0.0, 1.0) * _CoverageRate;
+				//shape_with_coverage *= cloud_coverage;
 				//shape_with_coverage *= densityFunc(heightRate, shape);
 
 				//final must in range [0, 1]
 				//So SHAPE_DENSITY_SCALE = [0, 1]
-				float final = clamp(shape_with_coverage - _DensityThreshold, 0.0, 1.0) * SHAPE_DENSITY_SCALE;
+				float final = clamp(noise.r, 0.0, 1.0);
 
-				if (sampleDetail && final > 0.0f && _DetailDensityStrength > 0.0f)
-				{
-					return calculateDetailDensity(pos, heightRate, final, height_type.g) * _DensityScale;
-				}
+				//if (sampleDetail && final > 0.0f && _DetailDensityStrength > 0.0f)
+				//{
+				//	final = calculateDetailDensity(pos, heightRate, final, height_type.g);
+				//}
 
-				return final * _DensityScale;
+				return (saturate(final) - _DensityThreshold) * _DensityScale;
 			}
 
 			float calculateLightDensity(float3 beginPos, in float3 lightDir)
 			{
 				float total_density = 0;
 				float density;
-				for (int i = 0; i < 4; i++)
+				float step = _LightStepLength;
+				float lum = 1.0;
+				for (int i = 0; i < 6; i++)
 				{
-					beginPos += lightDir * _LightStepLength * (i + 1);
+					//step = _LightStepLength * (i + 1);
+					beginPos += -lightDir * step;
 					float height_rate = calculateHeightRate(beginPos);
 					if(height_rate <= 1)
 					{
-						density = calculateShapeDensity(beginPos, height_rate, false);
-						total_density += max(0.0, density);
-					}
+						density = calculateShapeDensity(beginPos, height_rate, true);
+						if(density > 0)
+						{
+							float e = exp(-density * step * _LightAbsorption);
+							lum *= e;
+						}
+						//total_density += max(0.0, density * step);
+					}					
 				}
 
-				return saturate(total_density) * _LightStepLength;
+				return lum;
+			}
+
+			void myEnergyCalculate(inout float4 totalEnergy, in float currentCloudDensity, in float stepThickness, in float lightLum)
+			{
+				float view_transmittance = bear(currentCloudDensity * stepThickness);
+				float lum = lightLum * view_transmittance;				
+
+				totalEnergy.rgb += lum;
+				totalEnergy.a *= view_transmittance;
 			}
 
 			float4 calculateFinalColor(in float3 rayOrg, in float3 rayDir, in float3 lightDir, in float depth, in float2 uv)
@@ -153,113 +171,92 @@
 				if (_BlueNoiseIntensity > 0)
 				{
 					random_offset = _BlueNoiseTex2D.SampleLevel(sampler_BlueNoiseTex2D, squareUV(uv), 0);
-					//random_offset = frac(random_offset + float(_Time.x % 32) * 1.61803398875);
+					//random_offset = frac(random_offset + float(_FrameCount % 32) * 1.61803398875) * _BlueNoiseIntensity;
 					random_offset *= _BlueNoiseIntensity;
 				}
 
-				float step_thickness = _ShapeStepLength;
-				//float step_thickness = cloud_thickness / _StepCount;
+				float step_thickness = calculateStepThickness(cloud_thickness);
+				//float step_thickness = _ShapeStepLength;
 				float3 step_dir_length = rayDir * step_thickness;
 
-				float cos_angle = dot(rayDir, lightDir);
+				float cos_angle = dot(-rayDir, -lightDir);
 				float phase = phaseFunc(cos_angle, _PhaseParams);
 				//phase = max(phase, _PhaseParams.w);
 
-				float fog_phase = hgFunc(cos_angle, _PhaseParams.y);
-				int fog_step_count = 0;
+				//float fog_phase = hgFunc(cos_angle, _PhaseParams.y);
+				//int fog_step_count = 0;
 
 				float4 final_light = float4(0.0, 0.0, 0.0, 1.0);
 				int zero_count = 0;
 				bool impact_cloud = false;
 
-				float total_thickness = step_thickness * random_offset;
+				float total_thickness = 0;
 				float3 begin_pos = rayOrg + rayDir * dst_to_begin_pos;
-				begin_pos += step_thickness * random_offset;
+				begin_pos += rayDir * step_thickness * random_offset;
+				//float total_density = 0;
 
 				//float light_step_length = cloud_thickness * 0.5f / 6;
 
-
-				while (total_thickness < cloud_thickness)
-				//for (int i = 0; i < _StepCount; i++)
+				//while (total_thickness < cloud_thickness)
+				for (int i = 0; i < _StepCount; i++)
 				{
 					if (total_thickness + dst_to_begin_pos > depth)
 					{
 						break;
 					}
 
-					float height_rate = calculateHeightRate(begin_pos);
-					if (impact_cloud)
+					/*
+					float4 noise = _ShapeTex3D.SampleLevel(sampler_ShapeTex3D, begin_pos, 0);
+					if(noise.r < 0)
 					{
-						float density = calculateShapeDensity(begin_pos, height_rate, true);
-						//没有碰到云,大步前进
-						//并转到低采样模式
-						if (density <= 0.0f)
-						{
-							zero_count++;
-							impact_cloud = false;
-
-							total_thickness += 2 * step_thickness;
-							begin_pos += 2 * step_dir_length;
-
-							_VFog += fog_phase;
-						}
-						else
-						{
-							float light_total_density = calculateLightDensity(begin_pos, lightDir);
-							calculateLightEnergy(final_light
-								, density
-								, light_total_density
-								, phase
-								, height_rate
-								, step_thickness
-								, cos_angle);
-
-							//transmittance
-							if (final_light.a <= 0.01f)
-							{
-								final_light.a = 0;
-								break;
-							}
-
-							zero_count = 0;
-							total_thickness += step_thickness;
-							begin_pos += step_dir_length;
-
-							_VFog += fog_phase * density;
-						}
-
-						//fog_step_count++;
-						//pre_density = density;
+						final_light = float4(1.0f, 1.0f, 0.0f, 0.0f);
+					}
+					if(noise.r > 1.0)
+					{
+						final_light = float4(1.0f, 0.0f, 1.0f, 0.0f);
 					}
 					else
 					{
-
-						float test_density = calculateShapeDensity(begin_pos, height_rate, false);
-
-						if (test_density > 0.0f)
-						{
-							impact_cloud = true;
-
-							//如果zero_count=0
-							//说明是第一次跳进来,不用后退
-							//如果>0,说明是云层采样中突然遇到空点跳转过来的
-							//需要后退一步以防错过
-							if (zero_count > 0)
-							{
-								zero_count = 0;
-								total_thickness -= step_thickness;
-								begin_pos -= step_dir_length;
-							}
-						}
-						else
-						{
-							zero_count++;
-							impact_cloud = false;
-
-							total_thickness += 2 * step_thickness;
-							begin_pos += 2 * step_dir_length;
-						}
+						final_light = float4(0.0f, 0.0f, 0.0f, 0.0f);
 					}
+					*/
+					
+					
+					float height_rate = calculateHeightRate(begin_pos);
+					float density = calculateShapeDensity(begin_pos, height_rate, true);
+					if(density <= 0)
+					{
+						total_thickness += step_thickness;
+						begin_pos += step_dir_length;
+						continue;
+					}
+
+					float light_total_density = calculateLightDensity(begin_pos, lightDir);
+					//calculateLightEnergy(final_light
+					//	, density
+					//	, light_total_density
+					//	, phase
+					//	, height_rate
+					//	, step_thickness
+					//	, cos_angle);
+
+					myEnergyCalculate(final_light, density, step_thickness, light_total_density);
+
+					//transmittance
+					if (final_light.a <= 0.01f)
+					{
+						final_light.a = 0;
+						break;
+					}
+					
+					//final_light.r += density * _DensityScale;
+					//if(final_light.r >= 1.0)
+					//{
+					//	break;
+					//}
+
+					total_thickness += step_thickness;
+					begin_pos += step_dir_length;
 				}
 
 				return float4(final_light.rgb, final_light.a);
@@ -270,7 +267,7 @@
 				v2f o;
 				o.vertex = UnityObjectToClipPos(v.vertex);
 				o.uv = v.uv;
-				o.viewDir = calculateViewDir(v.uv);
+				o.viewDir = calculateViewDir3(v.uv);
 				return o;
 			}
 
@@ -279,22 +276,26 @@
 				float3 ray_o;
 				float3 ray_dir;
 				float3 light_dir;
-				float linear_eye_depth;
+				float depth;
 				calulateRayMarchDatas(i.uv, i.viewDir
-					, ray_o, ray_dir, light_dir, linear_eye_depth);
+					, ray_o, ray_dir, light_dir, depth);
 
-				float4 col_params = calculateFinalColor(ray_o, ray_dir, light_dir, linear_eye_depth, i.uv);
+				float4 col_params = calculateFinalColor(ray_o, ray_dir, light_dir, depth, i.uv);
 
-				float3 col = tex2D(_ScreenTex, i.uv);
-				float3 cloud_col = col_params.rgb * _LightColor0
+				float3 col = tex2D(_MainTex, i.uv);
+				float3 cloud_col = col_params.rgb
+				 	//* _LightColor0
 					//+ (col_params.rgb * unity_AmbientSky.rgb)
 					;
+				//cloud_col = lerp(_CloudColorBlack.rgb, _CloudColorLight, col_params.rgb) * (1 -  col_params.a);
 
 				//cloud_col = lerp(_VFog, cloud_col,  col_params.rgb);
 				//cloud_col = mix(cloud_col, col, pow(_VFog, .7));
 
+				//cloud_col = pow(cloud_col, 0.4545);
 				col = col * col_params.a
-					+ cloud_col
+					//+ cloud_col
+					//+ col * (1 - col_params.a) * 0.3
 					//+ _VFog * col_params.a
 					;
 				//+ (1 - col_params.y) * forwardScattering * _ForwardScatteringScale;

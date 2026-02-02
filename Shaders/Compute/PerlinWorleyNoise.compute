@@ -1,0 +1,19 @@
+﻿#include "../Head/Function.cginc"
+
+#pragma kernel CSMain
+
+Texture3D<float4> inWorleyNoiseTex3D;
+Texture3D<float> inPerlinNoiseTex3D;
+RWTexture3D<float4> outPerlinWorleyNoiseTex3D;
+
+[numthreads(8, 8, 2)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    float4 worley = inWorleyNoiseTex3D[id];
+    float perlin = inPerlinNoiseTex3D[id];
+
+    //float perlin_worley = saturate(remap(perlin, 1.0f - worley.r, 1.0, 0.0, 1.0));
+    float perlin_worley = saturate(remap(perlin, 0.0, 1.0, worley.g, 1.0));
+    //perlin_worley = saturate(remap(perlin_worley, 0.8, 1.0, 0.0, 1.0));
+    outPerlinWorleyNoiseTex3D[id] = float4(perlin_worley, worley.g, worley.b, worley.a);
+}

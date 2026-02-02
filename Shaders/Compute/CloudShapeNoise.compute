@@ -16,8 +16,8 @@ StructuredBuffer<int> inCloudWLGroupGridCount;
 int inResolution;
 
 int inCloudPLOctave;
-float inCloudPLFrequency;
-float inCloudPLLacunarity;
+int inCloudPLFrequency;
+int inCloudPLLacunarity;
 float inCloudPLPersistence;
 float3 inCloudPLOffset;
 
@@ -27,7 +27,7 @@ float inCloudWLFrequency;
 float3 inCloudWLOffset;
 
 float calculateWorleyNoise(in StructuredBuffer<int3> samplePoints
-	, float3 pos, float freq, int octave, int gridCount)
+	, float3 pos, int freq, int octave, int gridCount)
 {
 	float grid_rate = 1.0f / gridCount;
 	int grid_length = inResolution / gridCount;
@@ -59,13 +59,13 @@ float calculateWorleyNoise(in StructuredBuffer<int3> samplePoints
 
 float calculatePerlinNoise(in float3 pos)
 {
-	float freq = floor(inCloudPLFrequency);
+	int freq = inCloudPLFrequency;
 	float strength = 1.0f;
 	float sum_strength = 0;
 	float noise = 0;
 	for (int o = 0; o < inCloudPLOctave; o++)
 	{
-		noise += pn3D(pos * freq + inCloudPLOffset, freq) * strength;
+		noise += pn3D(pos + inCloudPLOffset, freq) * strength;
 		//noise += pnoise(pos * freq, freq) * strength;
 		sum_strength += strength;
 
@@ -75,7 +75,7 @@ float calculatePerlinNoise(in float3 pos)
 
 	noise /= sum_strength;
 
-	return noise * 0.5f + 0.5f;
+	return noise;
 	//return noise;
 }
 
@@ -85,25 +85,25 @@ void main3D(uint3 id : SV_DispatchThreadID)
 	float3 pos = id / (float)inResolution;
 
 	float worley00 = calculateWorleyNoise(inCloudWLMarkPoints3D0
-		, pos, inCloudWLFrequency, 1
+		, pos, inCloudWLFrequency, 2
 		, inCloudWLGroupGridCount[0]);
 
 	float worley01 = calculateWorleyNoise(inCloudWLMarkPoints3D1
-		, pos, inCloudWLFrequency, 1
+		, pos, inCloudWLFrequency, 2
 		, inCloudWLGroupGridCount[1]);
 
 	float worley02 = calculateWorleyNoise(inCloudWLMarkPoints3D2
-		, pos, inCloudWLFrequency, 1
+		, pos, inCloudWLFrequency, 2
 		, inCloudWLGroupGridCount[2]);
 
 	float worley03 = calculateWorleyNoise(inCloudWLMarkPoints3D3
-		, pos, inCloudWLFrequency, 1
+		, pos, inCloudWLFrequency, 2
 		, inCloudWLGroupGridCount[3]);
 
 	float perlin = calculatePerlinNoise(pos);
-	perlin = smoothstep(0.0, 1.0, perlin);
+	//perlin = smoothstep(0.0, 1.0, perlin);
 
-	float perlin_worley = remap(perlin, 0.0f, 1.0f, worley00, 1.0f);
+	float perlin_worley = remap(perlin, 0.0, 1.0f, worley00, 1.0f);
 	//float perlin_worley = remap(perlin, worley00, 1.0f, 0.0f, 1.0f);
 	//float perlin_worley = worley00 - perlin * (1 - worley00);
 

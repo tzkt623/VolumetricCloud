@@ -1,6 +1,8 @@
 ﻿#ifndef Worley_Noise
 #define Worley_Noise
 
+#include "../Head/Function.cginc"
+
 #define FloatMax 3.402823466e+38f
 
 //-----------------------------------------------------
@@ -215,6 +217,102 @@ float getNoiseF(in StructuredBuffer<int3> samplePoints, in int resolution, float
 	int3 cp = int3(pos.x * resolution, pos.y * resolution, pos.z * resolution);
 
 	return getCloseDistance(n27, cp) / gridLength;
+}
+
+struct FBMConfig
+{
+    int octaves;
+    float lacunarity;
+    float frequency;
+    float amplitude;
+    float gain;
+};
+
+float worlyNoise33(uint3 id, int resolution, int cellCount, float3 posOffset)
+{
+    float edge_length = resolution / cellCount;
+    int3 cell_index = int3(id.x / edge_length, id.y / edge_length, id.z / edge_length);
+    float3 current_pos = float3(id.x, id.y, id.z);
+    float min_distance = FloatMax;
+
+    for (int z = -1; z <= 1; z++)
+    {
+        for (int y = -1; y <= 1; y++)
+        {
+            for (int x = -1; x <= 1; x++)
+            {
+                float3 offset = float3(0.0f, 0.0f, 0.0f);
+                float3 neighbor = float3(cell_index.x + x, cell_index.y + y, cell_index.z + z);
+                
+                if (neighbor.x < 0)
+                {
+                    neighbor.x = cellCount - 1;
+                    offset.x = -resolution;
+                }
+                else if (neighbor.x >= cellCount)
+                {
+                    neighbor.x = 0;
+                    offset.x = resolution;
+                }
+                
+                if (neighbor.y < 0)
+                {
+                    neighbor.y = cellCount - 1;
+                    offset.y = -resolution;
+                }
+                else if (neighbor.y >= cellCount)
+                {
+                    neighbor.y = 0;
+                    offset.y = resolution;
+                }
+                
+                if (neighbor.z < 0)
+                {
+                    neighbor.z = cellCount - 1;
+                    offset.z = -resolution;
+                }
+                else if (neighbor.z >= cellCount)
+                {
+                    neighbor.z = 0;
+                    offset.z = resolution;
+                }
+                
+                float3 mark_pos = (neighbor + hash33(neighbor + posOffset)) * edge_length;
+                mark_pos += offset;
+                min_distance = min(min_distance, distance(mark_pos, current_pos));
+            }
+        }
+    }
+
+    //return dis;
+    return (min_distance / edge_length);
+}
+
+float fbmWorley(uint3 id, int resolution, int cellCount, float3 posOffset, float amplitudeFactor, int octaves)
+{
+    float result = 0.0f;
+    float amplitude = 1.0f;
+    int frequency = 1;
+    float sum = 0.0f;
+    for (int i = 0; i < octaves; i++)
+    {
+        float noise = 1 - worlyNoise33(id, resolution, cellCount * frequency, posOffset);
+        //noise = pow(noise, 2.0f);
+        result += noise * amplitude;
+        frequency *= 2;
+        sum += amplitude;
+        amplitude *= amplitudeFactor;
+    }
+    
+    return result / sum;
+}
+
+float fbmWorleyGPUPro(uint3 id, int resolution, int cellCount, float3 posOffset, int3 powFactor)
+{
+    float noise = pow((1 - worlyNoise33(id, resolution, cellCount, posOffset)), 2) * 0.625f
+    + pow((1 - worlyNoise33(id, resolution, cellCount * 2, posOffset)), 2) * 0.25f
+    + pow((1 - worlyNoise33(id, resolution, cellCount * 4, posOffset)), 2) * 0.125f;
+    return noise;
 }
 
 #endif

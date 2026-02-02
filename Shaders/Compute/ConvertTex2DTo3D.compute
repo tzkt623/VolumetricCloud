@@ -1,0 +1,33 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel main
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWTexture3D<float> outTex3D;
+Texture2D<float3> inTex2D;
+
+int inCellCountX;
+int inCellCountY;
+int inTexWidth;
+int inTexHeight;
+
+[numthreads(1,1,1)]
+void main (uint3 id : SV_DispatchThreadID)
+{
+    //算出每个格子的长宽
+    int cell_length_x = inTexWidth / inCellCountX;
+    int cell_length_y = inTexHeight / inCellCountY;
+
+    //根据长宽算出格子的ID
+    int cell_x = id.x / cell_length_x;
+    int cell_y = id.y / cell_length_y;
+    //根据格子ID算出堆叠的层数的ID
+    int cell_z = cell_x + cell_y * inCellCountX;
+
+    int2 uv = int2(id.x, inTexHeight - id.y);
+    float col = inTex2D[uv].r;
+
+    //3D Texutre的宽高为cell_length_x,cell_length_y
+    int3 uvw = int3(uv.x % cell_length_x, uv.y % cell_length_y, cell_z);
+    outTex3D[uvw] = col;
+}

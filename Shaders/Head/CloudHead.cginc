@@ -1,14 +1,16 @@
 ﻿#ifndef CloudHead
 #define CloudHead
 
+#include "Function.cginc"
+
 //----------------------------
 //
 // Base Info
 //
-sampler2D _ScreenTex;
 sampler2D _CameraDepthTexture;
+sampler2D _MainTex;
 float3 _CameraUp;
-
+float4x4 _Matrix_Inv_VP;
 //----------------------------
 //
 // Cloud Texture
@@ -28,18 +30,33 @@ SamplerState sampler_HeightTypeTex2D;
 Texture2D _BlueNoiseTex2D;
 SamplerState sampler_BlueNoiseTex2D;
 
+int _FrameCount;
+
 //----------------------------
 //
 // Shape
 //
-float _StepCount;
+int _ShapeData01;
+float4 _ShapeData02;
+float4 _ShapeData03;
+float4 _ShapeData04;
+
+#define _StepCount _ShapeData01
+#define _ShapeScale _ShapeData02.x
+#define _ShapeDensityStrength _ShapeData02.y
+#define _DensityThreshold _ShapeData02.z
+#define _DensityScale _ShapeData02.w
+#define _CloudOffset _ShapeData03.xyz
+#define _CloudSpeed _ShapeData04.xyz
+
+
+float4 _DetailData01;
+#define _DetailScale _DetailData01.x
+#define _DetailDensityStrength _DetailData01.y
+#define _DetailDensityScale _DetailData01.z
+
+float4 _ShapeMixFactor;
 float _ShapeStepLength;
-float _ShapeScale;
-float _DetailScale;
-float _ShapeDensityStrength;
-float _DetailDensityStrength;
-float _DensityThreshold;
-float _DensityScale;
 #define SHAPE_SCALE (_ShapeScale)
 #define DETAIL_SCALE (_DetailScale)
 #define SHAPE_DENSITY_SCALE (_ShapeDensityStrength )
@@ -55,10 +72,13 @@ static float3 FBM_FACTOR = float3(0.625, 0.25, 0.125);
 //
 // Weather
 //
-float2 _WeatherOffset;
-float _CoverageRate;
-float _AnvilRate;
-float _WeatherScale;
+float4 _WeatherData001;
+float4 _WeatherData002;
+
+#define _WeatherScale _WeatherData001.x
+#define _Coverage _WeatherData001.y
+#define _WeatherOffset _WeatherData002.xy
+#define _WeatherSpeed _WeatherData002.zw
 
 //-----------------------
 //
@@ -66,25 +86,44 @@ float _WeatherScale;
 //
 float3 _ShapeSpeedScale;
 float3 _DetailSpeedScale;
-float3 _CloudOffset;
-float3 _CloudSpeed;
 float3 _WindDirection;
+
+#define SHAPE_OFFSET (_ShapeSpeedScale * _Time.x)
+#define DETAIL_OFFSET (_DetailSpeedScale * _Time.x)
+#define WEATHER_OFFSET (_WeatherOffset * _Time.x)
 
 //----------------------------
 //
 // Light
 //
+float4 _LightData01;
+#define _LightAbsorption _LightData01.x
+#define _LightStepLength _LightData01.y
+#define _DarknessThreshold _LightData01.z
+
+float4 _LightData02;
+#define _CloudAbsorption _LightData02.x
+#define _CloudColorOffsetLight _LightData02.y
+#define _CloudColorOffsetBlack _LightData02.z
+#define _SunAngleRate _LightData02.w
+
 float3 _LightDir;
-float _LightStepLength;
 float4 _CloudColorLight;
 float4 _CloudColorBlack;
-float _CloudAbsorption;
-float _LightAbsorption;
-float _DarknessThreshold;
+float4 _CloudColorLight2;
+float4 _CloudColorBlack2;
 float _ForwardScatteringScale;
 float4 _PhaseParams;
 float3 _EnergyStrength;
 int _MSOctave;
+
+#define SCATTER_FORWRAD_PARAMS _PhaseParams.x
+#define SCATTER_BACK_PARAMS _PhaseParams.x
+
+#define AMBIENT_STRENGTH _EnergyStrength.x
+#define SUN_STRENGTH _EnergyStrength.y
+#define BRIGHTNESS _EnergyStrength.z
+
 
 //--------------------------
 //
@@ -106,6 +145,11 @@ float _BlueNoiseIntensity;
 #define CAM_IN_CLOUD 1
 #define CAM_OUT_CLOUD 2
 
+
+//----------------------------------
+//
+// Area Data
+//
 int _DrawAreaIndex;
 float3 _BoxMin;
 float3 _BoxMax;
@@ -115,9 +159,30 @@ float3 _BoxMax;
 //2在云层上
 int _ViewPosition;
 float4 _PlanetData;
-float2 _PlanetCloudThickness;
+float4 _CloudData;
+
+#define _PlanetCenter _PlanetData.xyz
+#define _PlanetRadius _PlanetData.w
+#define _CloudMin _CloudData.x
+#define _CloudMax _CloudData.y
+#define _CloudThickness _CloudData.z
+
+//----------------------------
+//
+// Ext
+//
+float4 _ExtData001;
+int4 _ExtData002;
+float4 _ExtData003;
 
 
+//----------------------------
+//
+// Debug
+//
+int _DebugData001;
+
+#define ShowDebugUV _DebugData001
 
 //---------------------------------
 //
@@ -125,23 +190,54 @@ float2 _PlanetCloudThickness;
 //
 float3 calculateViewDir(in float2 uv)
 {
-	float3 ndc_pos = float3(uv * 2 - 1, 0);
+	float3 ndc_pos = float3(uv * 2 - 1, 1);
 	float4 clip_pos = float4(ndc_pos, -1);
-	float3 view_pos = mul(unity_CameraInvProjection, clip_pos).xyz;
-	return mul(unity_CameraToWorld, float4(view_pos, 0.0f));
+	float4 view_pos = mul(unity_CameraInvProjection, clip_pos);
+	return mul(unity_CameraToWorld, float4(view_pos.xyz, 0.0f));
+}
+
+float3 calculateViewDir2(in float2 uv)
+{
+	float4 ndc_pos = float4(uv * 2.0f - 1.0f, 1.0f, 1.0f);
+	//ndc_pos = mul(unity_CameraInvProjection, ndc_pos);
+	//ndc_pos /= ndc_pos.w;
+	//float4 world_pos = mul(unity_CameraToWorld, ndc_pos);
+
+	float4 world_pos = mul(_Matrix_Inv_VP, ndc_pos);
+
+	world_pos /= world_pos.w;
+	world_pos.xyz = world_pos.xyz - _WorldSpaceCameraPos;
+	
+	return normalize(world_pos.xyz);
+}
+
+float3 calculateViewDir3(in float2 uv)
+{
+	float3 ndc_pos = float3(uv * 2.0f - 1.0f, 1.0f);
+	float3 clip_pos = ndc_pos;
+	float4 view_pos = mul(unity_CameraInvProjection, clip_pos.xyzz);
+	view_pos /= view_pos.w;
+	view_pos.z *= -1;
+	float3 world_dir = mul(unity_CameraToWorld, float4(view_pos.xyz, 0.0f));
+	
+	//不用normalize,要在fragshader里面normalize
+	//return world_dir;
+	return normalize(world_dir);
 }
 
 void calulateRayMarchDatas(in float2 uv, in float3 viewDir
 	, out float3 rayO, out float3 rayDir, out float3 lightDir, out float depth)
 {
-	rayO = _WorldSpaceCameraPos;
-	float ray_length = length(viewDir);
-	rayDir = viewDir / ray_length;
-	//_WorldSpaceLightPos0.xyz是指向光源的方向
-	lightDir = normalize(_WorldSpaceLightPos0.xyz);
+	rayO = _WorldSpaceCameraPos.xyz;
+	rayDir = normalize(viewDir);
+	//float ray_length = length(viewDir);
+	//rayDir = viewDir / ray_length;
+	//_WorldSpaceLightPos0.xyz是光源方向的反方向,也就是指向光源
+    //lightDir = normalize(_WorldSpaceLightPos0.xyz);
+    lightDir = _WorldSpaceLightPos0.xyz;
 
 	float depth_in_buffer = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv).r;
-	depth = LinearEyeDepth(depth_in_buffer) * ray_length;
+	depth = LinearEyeDepth(depth_in_buffer);
 }
 
 //--------------------------------------------------------------------
@@ -159,10 +255,10 @@ float2 squareUV(in float2 uv)
 	return float2 (x / scale, y / scale);
 }
 
-float2 rayBoxDst(in float3 boxMin, in float3 boxMax, in float3 pos, in float3 rayDir)
+float2 rayBoxDst(in float3 boxMin, in float3 boxMax, in float3 pos, in float3 invRayDir)
 {
-	float3 t0 = (boxMin - pos) / rayDir;
-	float3 t1 = (boxMax - pos) / rayDir;
+	float3 t0 = (boxMin - pos) * invRayDir;
+	float3 t1 = (boxMax - pos) * invRayDir;
 
 	float3 tmin = min(t0, t1);
 	float3 tmax = max(t0, t1);
@@ -177,6 +273,7 @@ float2 rayBoxDst(in float3 boxMin, in float3 boxMax, in float3 pos, in float3 ra
 	return float2(dstToBox, dstInBox);
 }
 
+//(射线发射点到球体的距离,射线穿过球体的距离)
 float2 raySphereDst(in float3 sphereCenter, in float sphereRadius, in float3 pos, in float3 rayDir)
 {
 	float3 oc = pos - sphereCenter;
@@ -190,26 +287,29 @@ float2 raySphereDst(in float3 sphereCenter, in float sphereRadius, in float3 pos
 	return float2(dstToSphere, dstInSphere);
 }
 
+//输出(到云层的距离,当前位置朝向下的云层厚度)
 bool calculatePlanetCloudData(in int viewPosition
-	, in float4 sphereData, in float2 cloudThicknessMinMax
-	, in float3 pos, in float3 rayDir
-	, out float2 cloudData)
+	, in float4 sphereData, in float4 inCloudData
+	, in float3 rayPos, in float3 rayDir
+	, out float2 outCloudData)
 {
 	if (viewPosition == CAM_UNDER_GROUND)
 	{
 		return false;
 	}
 
-	float2 cloud_min = raySphereDst(sphereData.xyz, sphereData.w + cloudThicknessMinMax.x, pos, rayDir);
-	float2 cloud_max = raySphereDst(sphereData.xyz, sphereData.w + cloudThicknessMinMax.y, pos, rayDir);
+    float2 cloud_min = raySphereDst(sphereData.xyz, sphereData.w + inCloudData.x, rayPos, rayDir);
+    float2 cloud_max = raySphereDst(sphereData.xyz, sphereData.w + inCloudData.y, rayPos, rayDir);
 
 	//地表上
 	if (viewPosition == CAM_UNDER_CLOUD)
 	{
-		//beginPos = pos + rayDir * cloud_min.y;
-
-		cloudData.x = cloud_min.y;
-		cloudData.y = cloud_max.y - cloud_min.y;
+		//如果在地表上
+		//相机位置在小球和大球内
+		//则到云层的距离就是cloud_min.y,即射线在小球内行进的距离
+		//云层厚度就是射线在大球中行进的距离-小球中行进的距离,即cloud_max.y - cloud_min.y
+        outCloudData.x = cloud_min.y;
+        outCloudData.y = cloud_max.y - cloud_min.y;
 
 		return true;
 	}
@@ -218,25 +318,38 @@ bool calculatePlanetCloudData(in int viewPosition
 	{
 		//beginPos = pos;
 
-		cloudData.x = 0;
-		cloudData.y = cloud_min.y > 0 ? cloud_min.x : cloud_max.y;
+        outCloudData.x = 0;
+		//如果在云层中
+		//相机就是在小球上方和大球下方之间
+		//云层的厚度就得看相机看向哪个位置
+		//1.如果相机看向小球,那么云层厚度就是相机位置到小球面的距离,即cloud_min.x
+		//2.如果相机看向大球,那么云层厚度就是相机位置在云层中的行进距离,即cloud_max.y
+		//如何分辨相机看向哪个位置呢?
+		//看cloud_min.y是否大于等于0,大于0说明射线在小球内部行进,说明相机看向小球,等于0说明相切
+        outCloudData.y = cloud_min.y >= 0 ? cloud_min.x : cloud_max.y;
 
 		return true;
 	}
 	//在云层外
 	else if (viewPosition == CAM_OUT_CLOUD)
 	{
+		//如果相机在云层外
+		//射线想要穿过云层,在云层中的行进距离必须大于0,即cloud_max.y必须大于0
+		//那么到云层的距离就是射线到大球的距离,即cloud_max.x
+		//云层的厚度分为两种情况
+		//1.如果射线和小球相交,那么云层厚度就是射线抵达小球的距离-射线抵达大球的距离,即cloud_min.x - cloud_max.x
+		//  此时cloud_min.y一定大于0
+		//2.如果射线和小球不相交,那么云层厚度就是射线在大球中的行进距离,即cloud_max.y
 		if (cloud_max.y > 0)
-		{
-			//beginPos = pos + rayDir * cloud_max.x;
-
-			cloudData.x = cloud_max.x;
-			cloudData.y = cloud_min.x - cloud_max.x;
+		{		
+            outCloudData.x = cloud_max.x;
+            outCloudData.y = cloud_min.y > 0.0 ? (cloud_min.x - cloud_max.x) : cloud_max.y;
 			return true;
 		}
 	}
 
-	cloudData = -1;
+    outCloudData.x = 0;
+    outCloudData.y = 0;
 	//beginPos = 0;
 
 	return false;
@@ -283,9 +396,36 @@ float phaseDualLobe(in float cosAngle, in float4 energyParams)
 	return lerp(v1, v2, energyParams.z);
 }
 
+float HenyeyGreensteinPhaseFunction(float cosLV, float g)
+{
+    float g2 = g * g;
+    return (1 - g2) / (4 * UNITY_PI * pow(1 + g2 - 2 * g * cosLV, 1.5));
+}
+
+float SchlickPhaseFunction(float cosLV, float k)
+{
+    float k2 = k * k;
+    return (1 - k2) / (4 * UNITY_PI * pow(1 - k * cosLV, 2));
+}
+
+float phase1(float cosLV, in float4 energyParams)
+{
+    float frontLight = HenyeyGreensteinPhaseFunction(cosLV, energyParams.x);
+    float backLight = HenyeyGreensteinPhaseFunction(cosLV, energyParams.y);
+    float phase = lerp(frontLight, backLight, 0.5) * energyParams.z + energyParams.w;
+    return phase;
+}
+
+float dualLobeHG(float cosTheta, in float4 energyParams)
+{
+    return lerp(HenyeyGreensteinPhaseFunction(cosTheta, energyParams.x)
+	, HenyeyGreensteinPhaseFunction(cosTheta, energyParams.y)
+	, energyParams.z) * energyParams.w;
+}
+
 float phaseFunc(in float cosAngle, in float4 energyParams)
 {
-	return phaseDualLobe(cosAngle, energyParams);
+    return phase1(cosAngle, energyParams);
 }
 
 float powderEffect(in float value)
@@ -296,8 +436,10 @@ float powderEffect(in float value)
 float powderEffect(in float value, in float cosAngle)
 {
 	float powder = 1.0 - exp(-value * 2.0);
-	return lerp(1.0f, powder, (cosAngle * 0.5f) + 0.5f);
+	return lerp(1.0f, powder, (-cosAngle * 0.5f) + 0.5f);
 }
+
+
 
 //HZ Funcion
 float bearPowder(float value)
@@ -308,9 +450,22 @@ float bearPowder(float value)
 	return bear_law * powder_sugar_effect * 2.0f;
 }
 
+float bearPowder2(float value)
+{
+    float bear_law = exp(-value * _LightAbsorption);
+	//float bear_law = max(exp(-value), exp(-value * 0.25) * 0.7);
+    float powder_sugar_effect = 1.0f - exp(-value * _DetailScale);
+    return bear_law * lerp(1.0, powder_sugar_effect, _DetailDensityStrength) * 2.0f;
+}
+
 float bear(float value)
 {
 	return exp(-value);
+}
+
+float bearNew2(float value)
+{
+    return exp(-value);
 }
 
 float bearNew(float value)
@@ -333,11 +488,38 @@ float3 multipleScattering(in float energy, in float cosAngle, in float density, 
 	
     for(float i = 0.0; i < _MSOctave; i++)
 	{
-		phase = phaseFunc(cosAngle, float4(_PhaseParams.x * c, _PhaseParams.y * c, _PhaseParams.z, 0.0));
+		phase = phaseFunc(cosAngle, float4(0.3 * c, -0.1 * c, 0.3, 0.0));
 		//sigmaS * bi * Li(wi) * P(wi, wo, ci*g) * exp(-ai * sigmaT * (s)ds)
-		luminance += _EnergyStrength.y * b * energy * phase * exp(-a * sigmaE * stepThickness * density);
+		luminance += b * energy * phase * exp(-a * sigmaE * stepThickness);
         a *= 0.5;
         b *= 0.5;
+		//b *= 2.5
+        c *= 0.5;
+    }
+
+    return luminance;
+}
+
+float3 multipleScattering2(in float energy, in float cosAngle, in float lightDensity, in float sigmaE)
+{
+    float3 luminance = 0.0;
+
+    // Attenuation
+    float a = 1.0;
+    // Contribution
+    float b = 1.0;
+    // Phase attenuation
+    float c = 1.0;
+
+	float phase = 0;
+	
+    for(float i = 0.0; i < _MSOctave; i++)
+	{
+		phase = phaseFunc(cosAngle * a, float4(SCATTER_FORWRAD_PARAMS * c, SCATTER_BACK_PARAMS * c, 0.3, 0.0));
+		//sigmaS * bi * Li(wi) * P(wi, wo, ci*g) * exp(-ai * sigmaT * (s)ds)
+		luminance += b * energy * phase;// * exp(-a * lightDensity * sigmaE * 1000);
+        a *= 0.9;
+        b *= 0.25;
 		//b *= 2.5
         c *= 0.5;
     }
@@ -392,27 +574,26 @@ void calculateLightEnergyMy1(inout float4 energy, in float cloudDensity, in floa
 	, in float heightRate, in float stepThickness, in float cosAngle)
 {
 	float d_int = cloudDensity * stepThickness;
-	float view_transmittance = bear(d_int);
+	float view_transmittance = bearNew(d_int);
 
 	float light_transmittance = bearNew(lightTotalDensity);
 	float shadow = _DarknessThreshold + light_transmittance * (1.0f - _DarknessThreshold);
 
-	float3 mult_scattering = 0;
+	float3 scattering = 0;
 	if(_MSOctave > 1)
 	{
-	 	mult_scattering = multipleScattering(light_transmittance, cosAngle, cloudDensity, stepThickness, view_transmittance);
+	 	scattering = _EnergyStrength.y * multipleScattering(light_transmittance, cosAngle, cloudDensity, stepThickness, view_transmittance);
 	}
 	else
 	{
-		mult_scattering = _EnergyStrength.y * light_transmittance * phase;
+		scattering = _EnergyStrength.y * light_transmittance * phase;
 	}
 
- 	float3 sun_light = _LightColor0.rgb * mult_scattering* _LightAbsorption
+ 	float3 sun_light = _LightColor0.rgb * scattering
 		* powderEffect(lightTotalDensity, cosAngle) * 2
-		* d_int
-		;
+		* d_int;
 
- 	float3 sky_light = unity_AmbientSky.rgb * clamp(heightRate, 0.5, 1.0)
+ 	float3 sky_light = lerp(_CloudColorBlack.rgb, _CloudColorLight.rgb, heightRate)
 		* d_int
 		* _EnergyStrength.x;
 	float3 lum = sun_light + sky_light;
@@ -433,31 +614,38 @@ void calculateLightEnergyFrostbite(inout float4 energy, in float cloudDensity, i
 
 	//float sigmaA = _CloudAbsorption;
 	const float sigmaA = 0;
-	float sigmaS = cloudDensity;
-	float sigmaE = max(sigmaA + sigmaS, 0.0000001);
+	const float sigmaS = 1;
+	const float sigmaE = max(sigmaA + sigmaS, 0.0000001);
 
-	float d_int = cloudDensity * stepThickness;
-	float transmittance = bear(sigmaE * stepThickness);
+	float sampleSigmaS = sigmaS * cloudDensity;
+	float sampleSigmaE = sigmaE * cloudDensity;
 
-	float absorption = bear(lightTotalDensity);
-	float shadow = _DarknessThreshold + absorption * (1.0f - _DarknessThreshold);
+	float view_transmittance = bear(sampleSigmaE * stepThickness * _CloudAbsorption);
+	float3 sun_lum = bear(lightTotalDensity * _LightAbsorption);
+	//lum = _DarknessThreshold + lum * (1.0f - _DarknessThreshold);
 
-	float3 mult_scattering = multipleScattering(absorption, cosAngle, cloudDensity, stepThickness, sigmaE);
+	float3 scattering = 0;
+	if(_MSOctave > 1)
+	{
+	 	scattering = multipleScattering2(sun_lum, cosAngle, lightTotalDensity, sampleSigmaE);
+	}
+	else
+	{
+		scattering = sun_lum * phase;
+	}
 
- 	float3 sun_light = _LightColor0.rgb * mult_scattering 
+ 	sun_lum = scattering
+		//* lerp(_CloudColorBlack.rgb, _CloudColorLight.rgb, scattering)
 		//* powderEffect(lightTotalDensity, cosAngle) * 2
-		//* d_int
-		;
+		* SUN_STRENGTH;
 
- 	float3 sky_light = (unity_AmbientSky.rgb * heightRate)
-		//* d_int
-		* _EnergyStrength.x;
+	float3 sky_lum = lerp(unity_AmbientGround.rgb, unity_AmbientSky.rgb, saturate(heightRate * 10)) * AMBIENT_STRENGTH;
 
-	float3 lum = sun_light + sky_light;
-	lum = (lum - lum * transmittance) / sigmaE;
+	float3 total_lum = (sun_lum + sky_lum) * sampleSigmaS;
+	total_lum = (total_lum - total_lum * view_transmittance) / sampleSigmaE;
 
-	energy.rgb += lum * energy.a * _EnergyStrength.z;
-	energy.a *= transmittance;
+	energy.rgb += energy.a * total_lum;
+	energy.a *= view_transmittance;
 }
 
 void calculateLightEnergy(inout float4 energy, in float cloudDensity, in float lightTotalDensity, in float phase
@@ -489,10 +677,10 @@ float getHeightFractionForPoint(float length, float2 inCloudMinMax)
 	return saturate(height_fraction);
 }
 
-float calculateHeightRateForSphereArea(in float3 pos, in float4 planetData, in float2 cloudThickness)
+float calculateHeightRateForSphereArea(in float3 pos, in float4 planetData, in float4 cloudData)
 {
-	float height = length(pos - planetData.xyz) - planetData.w - cloudThickness.x;
-	return height / (cloudThickness.y - cloudThickness.x);
+    float height = length(pos - planetData.xyz) - planetData.w - cloudData.x;
+    return height / cloudData.z;
 }
 
 float calculateHeightRateForBoxArea(in float3 pos, in float3 boxMin, in float3 boxMax)
@@ -519,6 +707,8 @@ float calculateEdgeForSphereArea(in float heightRate)
 
 float getCloudDatas(in float heightRate, in float cloudType)
 {
+	cloudType = remap(cloudType, _CloudColorLight.w, 1.0, 0.0, 1.0);
+
 	float stratus = max(0.0, remap(heightRate, 0.0, 0.1, 0.0, 1.0) * remap(heightRate, 0.2, 0.3, 1.0, 0.0));
 	float stratocumulus = max(0.0, remap(heightRate, 0.0, 0.25, 0.0, 1.0) * remap(heightRate, 0.3, 0.65, 1.0, 0.0));
 	float cumulus = max(0.0, remap(heightRate, 0.01, 0.3, 0.0, 1.0) * remap(heightRate, 0.6, 0.95, 1.0, 0.0));
@@ -538,7 +728,7 @@ float calculateHeightRate(in float3 pos)
 	}
 	else
 	{
-		result = calculateHeightRateForSphereArea(pos, _PlanetData, _PlanetCloudThickness);
+		result = calculateHeightRateForSphereArea(pos, _PlanetData, _CloudData);
 	}
 
 	return result;
@@ -550,7 +740,7 @@ bool calculateCloudThickness(in float3 rayOrg, in float3 rayDir, out float dst_t
 
 	if (_DrawAreaIndex == AREA_BOX)
 	{
-		cloud_area_data = rayBoxDst(_BoxMin, _BoxMax, rayOrg, rayDir);
+		cloud_area_data = rayBoxDst(_BoxMin, _BoxMax, rayOrg, 1.0f / rayDir);
 		dst_to_begin_pos = cloud_area_data.x;
 		cloud_thickness = cloud_area_data.y;
 	}
@@ -567,7 +757,7 @@ bool calculateCloudThickness(in float3 rayOrg, in float3 rayDir, out float dst_t
 			}
 		}
 
-		if (!calculatePlanetCloudData(_ViewPosition, _PlanetData, _PlanetCloudThickness, rayOrg, rayDir, cloud_area_data))
+		if (!calculatePlanetCloudData(_ViewPosition, _PlanetData, _CloudData, rayOrg, rayDir, cloud_area_data))
 		{
 			return false;
 		}
@@ -576,7 +766,7 @@ bool calculateCloudThickness(in float3 rayOrg, in float3 rayDir, out float dst_t
 		cloud_thickness = cloud_area_data.y;
 	}
 
-	if (cloud_thickness <= 0)
+	if (cloud_thickness <= 0.0f)
 	{
 		return false;
 	}
@@ -589,7 +779,8 @@ void calculateWeatherAndEdge(in float3 pos, in float heightRate, out float2 weat
 	if (_DrawAreaIndex == AREA_BOX)
 	{
 		edge = calculateEdgeForBox(pos, _BoxMin, _BoxMax);
-		weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, (pos.xz - _BoxMin.xz) / (_BoxMax.xz - _BoxMin.xz) * _WeatherScale, 0).rg;
+		float2 uv = (pos.xz - _BoxMin.xz) / (_BoxMax.xz - _BoxMin.xz) * _WeatherScale + WEATHER_OFFSET;
+		weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, uv, 0).rg;
 	}
 	else
 	{
@@ -597,7 +788,7 @@ void calculateWeatherAndEdge(in float3 pos, in float heightRate, out float2 weat
 		float2 uv;
 		if (_DrawAreaIndex == AREA_HORIZON_LINE)
 		{
-			uv = (pos.xz * _WeatherScale / (_PlanetData.w + _PlanetCloudThickness.y) * 0.5 + 0.5) + _WeatherOffset;
+			uv = (pos.xz * _WeatherScale / (_PlanetData.w + _CloudData.y) * 0.5 + 0.5) + WEATHER_OFFSET;
 			weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, uv , 0).rg;
 		}
 		else
@@ -605,11 +796,22 @@ void calculateWeatherAndEdge(in float3 pos, in float heightRate, out float2 weat
 			float3 pos_dir = normalize(pos * _WeatherScale - _PlanetData.xyz);
 			float3 bottom = float3(0, -1, 0);
 			float3 back = float3(-1, 0, 0);
-			uv = float2(dot(pos_dir, bottom) * 0.5 + 0.5, dot(pos_dir, back) * 0.5 + 0.5) + _WeatherOffset;
+			uv = float2(dot(pos_dir, bottom) * 0.5 + 0.5, dot(pos_dir, back) * 0.5 + 0.5) + WEATHER_OFFSET;
 
 			weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, uv, 0).rg;
 		}
 	}
+}
+
+
+float calculateStepThickness(in float cloudThickness)
+{
+	return _ShapeStepLength > 0 ? _ShapeStepLength : cloudThickness / _StepCount;
+}
+
+float calcCloudType(float heightRate, float lowMin, float lowMax, float highMin, float highMax)
+{
+    return saturate(remap(heightRate, lowMin, lowMax, 0.0f, 1.0f)) * saturate(remap(heightRate, highMin, highMax, 1.0f, 0.0f));
 }
 
 //----------------------------------------------------

@@ -20,6 +20,8 @@
 			#include "Head/Function.cginc"
 			#include "Head/CloudHead.cginc"
 
+			
+
 			struct appdata
 			{
 				float4 vertex : POSITION;
@@ -72,7 +74,7 @@
 				//}
 
 				float3 base_shape_with_cloud_types = base_shape * edge_x_rate * edge_z_rate * edge_y_rate;// *cloud_type;
-				base_shape_with_cloud_types *= remap(base_shape_with_cloud_types, _CoverageRate, 1.0, 0.0, 1.0);
+				base_shape_with_cloud_types *= remap(base_shape_with_cloud_types, _Coverage, 1.0, 0.0, 1.0);
 
 				//float3 weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, uvw.xz, 0);
 				//float coverage = weather.r;
@@ -114,7 +116,7 @@
 				}
 				else
 				{
-					if (!calculatePlanetCloudData(_ViewPosition, _PlanetData, _PlanetCloudThickness, pos, lightDir, cloud_area_data))
+					if (!calculatePlanetCloudData(_ViewPosition, _PlanetData, _CloudData, pos, lightDir, cloud_area_data))
 					{
 						return 0.0;
 					}
@@ -162,7 +164,7 @@
 					//}
 
 					//float height = getHeightFractionForPoint(begin_pos, float2(_BoxMin.y, _BoxMax.y));
-					float height = getHeightFractionForPoint(length(begin_pos - _PlanetData.xyz) - _PlanetData.w, _PlanetCloudThickness);
+		float height = getHeightFractionForPoint(length(begin_pos - _PlanetData.xyz) - _PlanetData.w, _CloudData.z);
 					float density = calculateDensity(begin_pos, height, 0);
 					if (density > 0.0)
 					{
@@ -210,7 +212,7 @@
 				}
 				else
 				{
-					if (!calculatePlanetCloudData(_ViewPosition, _PlanetData, _PlanetCloudThickness, rayOrg, rayDir, cloud_area_data))
+					if (!calculatePlanetCloudData(_ViewPosition, _PlanetData, _CloudData, rayOrg, rayDir, cloud_area_data))
 					{
 						return float4(0.0f, 0.0f, 0.0f, 1.0f);
 					}
@@ -251,7 +253,7 @@
 					}
 
 					//float height = getHeightFractionForPoint(begin_pos, float2(_BoxMin.y, _BoxMax.y));
-					float height = getHeightFractionForPoint(length(begin_pos - _PlanetData.xyz) - _PlanetData.w, _PlanetCloudThickness);
+					float height = getHeightFractionForPoint(length(begin_pos - _PlanetData.xyz) - _PlanetData.w, _CloudData.z);
 
 					if (test_density > 0.0)
 					{
@@ -335,7 +337,7 @@
 				float forwardScattering = saturate(dot(ray_dir, light_dir));//abs!!
 				//forwardScattering = pow(forwardScattering, 0.5);
 
-				float3 col = tex2D(_ScreenTex, i.uv);
+				float3 col = tex2D(_MainTex, i.uv);
 				float3 cloud_col = _LightColor0 * col_params.xyz
 					+ col_params.xyz * UNITY_LIGHTMODEL_AMBIENT.xyz
 					+ col_params.xyz * forwardScattering * _ForwardScatteringScale;

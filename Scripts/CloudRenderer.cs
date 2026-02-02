@@ -1,9 +1,6 @@
-﻿using System.Collections;
+﻿using System;
 using System.Collections.Generic;
-using UnityEditor;
 using UnityEngine;
-using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering;
 
 namespace tezcat.Framework.Exp
 {
@@ -11,21 +8,6 @@ namespace tezcat.Framework.Exp
         : MonoBehaviour
         , IPostRenderer
     {
-        public enum CloudArea
-        {
-            Box,
-            Planet,
-            HorizonLine
-        }
-
-        public enum CameraPos
-        {
-            UnderGround = -1,
-            UnderCloud = 0,
-            InCloud = 1,
-            OutCloud = 2
-        }
-
         [HideInInspector, SerializeField]
         int mCurrnetIndex = -1;
         [HideInInspector, SerializeField]
@@ -33,58 +15,74 @@ namespace tezcat.Framework.Exp
         [HideInInspector]
         public List<Shader> mShaderList = new List<Shader>();
 
-        [Header("Data")]
-        public BoxCloud mBoxCloud;
-        public PlanetCloud mPlanetCloud;
-        public HorizonLineCloud mHorizonLineCloud;
-        [Header("Draw Area")]
-        public CloudArea mDrawArea;
+        public bool mRefreshShaderIDs = false;
 
+        public NewCloudNoise mNewCloudNoise;
+
+        [Header("Data")]
+        public AreaData mAreaData;
         public ShapeData mShapeData;
+        public DetailData mDetailData;
         public WeatherMapData mWeatherMapData;
         public LightingData mLightingData;
-        public MotionData mMotionData;
         public FilterData mFilterData;
         public BlurData mBlurData;
+        public ExtensionData mExtensionData;
+        CloudRenderData mCloudData = new CloudRenderData();
 
-        RenderTexture mShapeTexture;
-        RenderTexture mDetailTexture;
+        [Header("Debug")]
+        public DebugUVData mDebugUV;
+
+        RenderTexture mShapeTexture = null;
+        RenderTexture mDetailTexture = null;
         Material mMaterial = null;
+        int mFrameCount;
 
+        List<Action> mDelayInitList = new List<Action>();
 
         void Start()
         {
-            if (mShapeData.mWorleyNoise.shapeTexture != null)
-            {
-                this.onShapeTextureCreated(mShapeData.mWorleyNoise.shapeTexture);
-            }
-            mShapeData.mWorleyNoise.onTextureCreated += onShapeTextureCreated;
-
-            if (mShapeData.mDetailNoise.renderTexture != null)
-            {
-                this.onDetailTextureCreated(mShapeData.mDetailNoise.renderTexture);
-            }
-            mShapeData.mDetailNoise.onTextureCreated += onDetailTextureCreated;
-
+            mCloudData.init();
+            mAreaData.init();
+            mShapeData.init();
+            mDetailData.init();
+            mLightingData.init();
             mWeatherMapData.init();
+            mFilterData.init();
+            mExtensionData.init();
+
+            mNewCloudNoise.mDetailNoise.evtTextureCreated += mCloudData.setDetailNoiseTex3D;
+            mNewCloudNoise.mCloudNoise.evtTextureCreated += mCloudData.setPerlinWorleyNoiseTex3D;
+            mNewCloudNoise.mWeatherNoise.evtTextureCreated += mWeatherMapData.setRenderTexture;
+            mNewCloudNoise.initGPU();
+
+            mDebugUV.init();
         }
 
-        private void onShapeTextureCreated(RenderTexture obj)
+        private void evtWeathTextureCreated(RenderTexture texture)
         {
-            mShapeTexture = obj;
-            if (mShapeTexture.dimension == TextureDimension.Tex3D)
+            mDelayInitList.Add(() =>
             {
-                mMaterial?.SetTexture("_ShapeTex3D", mShapeTexture);
-            }
+                mWeatherMapData.setRenderTexture(texture);
+            });
         }
 
-        private void onDetailTextureCreated(RenderTexture obj)
+        private void evtDetailTextureCreated(RenderTexture obj)
         {
             mDetailTexture = obj;
-            if (mDetailTexture.dimension == TextureDimension.Tex3D)
+            mDelayInitList.Add(() =>
             {
-                mMaterial?.SetTexture("_DetailTex3D", mDetailTexture);
-            }
+                mMaterial.SetTexture("_DetailNoiseTex3D", mDetailTexture);
+            });
+        }
+
+        private void evtCloudTextureCreated(RenderTexture obj)
+        {
+            mShapeTexture = obj;
+            mDelayInitList.Add(() =>
+            {
+                mMaterial.SetTexture("_PerlinWorleyNoiseTex3D", mShapeTexture);
+            });
         }
 
         public void setShader(int i)
@@ -107,15 +105,9 @@ namespace tezcat.Framework.Exp
 
         public void rendering(RenderTexture source, RenderTexture destination)
         {
-            if (mShapeTexture.dimension != TextureDimension.Tex3D)
-            {
-                Graphics.Blit(source, destination);
-                return;
-            }
-
             if (mMaterial == null)
             {
-                if(mCurrnetIndex < 0)
+                if (mCurrnetIndex < 0)
                 {
                     mCurrnetIndex = mShaderList.Count - 1;
                 }
@@ -127,81 +119,31 @@ namespace tezcat.Framework.Exp
                 }
 
                 mMaterial = new Material(mShaderList[mCurrnetIndex]);
+                mWeatherMapData.material = mMaterial;
             }
 
-            //-----------------------------------
-            //
-            //  Data
-            //
-            mMaterial.SetTexture("_ScreenTex", source);
-            mMaterial.SetTexture("_ShapeTex3D", mShapeTexture);
-            mMaterial.SetTexture("_DetailTex3D", mDetailTexture);
-
-            //-----------------------------------
-            //
-            //  Shape
-            //
-            mShapeData.sendToGPU(mMaterial);
-
-            //-----------------------------------
-            //
-            //  Weather
-            //
-            mWeatherMapData.sendToGPU(mMaterial);
-
-            //-----------------------------------
-            //
-            //  Light
-            //
-            mLightingData.sendToGPU(mMaterial);
-
-            //-----------------------------------
-            //
-            //  Motion
-            //
-            mMotionData.sendToGPU(mMaterial);
-
-            //------------------------------------
-            //
-            //  Filter
-            //
-            mFilterData.sendToGPU(mMaterial);
-
-            //------------------------------------
-            //
-            //  Area
-            //
-            mMaterial.SetInt("_DrawAreaIndex", (int)mDrawArea);
-            switch (this.mDrawArea)
+            if (mDelayInitList.Count > 0)
             {
-                case CloudArea.Box:
-                    {
-                        mMaterial.SetVector("_BoxMin", mBoxCloud.min);
-                        mMaterial.SetVector("_BoxMax", mBoxCloud.max);
-                    }
-                    break;
-                case CloudArea.Planet:
-                    {
-                        this.sendSphereAreaData(mPlanetCloud);
-                    }
-                    break;
-                case CloudArea.HorizonLine:
-                    {
-                        this.sendSphereAreaData(mHorizonLineCloud);
-                    }
-                    break;
-                default:
-                    break;
+                foreach (var func in mDelayInitList)
+                {
+                    func();
+                }
+                mDelayInitList.Clear();
             }
 
+            // Camera.main.projectionMatrix
+            mMaterial.SetMatrix("_Matrix_Inv_VP", Camera.main.previousViewProjectionMatrix.inverse);
 
-            //----------------------------------------------
-            //
-            //  BilateralBlur
-            //
-            //var full_resolution = Screen.currentResolution;
-            //Screen.SetResolution(full_resolution.width / 2, full_resolution.height / 2, true);
+            mAreaData.sendToGPU(mMaterial);
+            mShapeData.sendToGPU(mAreaData, mMaterial);
+            mDetailData.sendToGPU(mMaterial);
+            mWeatherMapData.sendToGPU(mMaterial);
+            mLightingData.sendToGPU(mMaterial);
+            mFilterData.sendToGPU(mMaterial);
+            mExtensionData.sendToGPU(mMaterial);
+            mCloudData.sendToGPU(mMaterial);
 
+            mDebugUV.sendToGPU(mMaterial);
             if (mBlurData.mEnableBilateralBlur)
             {
                 mBlurData.sendToGPU(mMaterial, source, destination);
@@ -210,65 +152,26 @@ namespace tezcat.Framework.Exp
             {
                 Graphics.Blit(source, destination, mMaterial);
             }
-
-            //Screen.SetResolution(full_resolution.width, full_resolution.height, true);
         }
 
         private void OnDestroy()
         {
-            mShapeData.mWorleyNoise.onTextureCreated -= this.onShapeTextureCreated;
-            mShapeData.mDetailNoise.onTextureCreated -= this.onDetailTextureCreated;
-
             mBlurData?.close();
-
-            mShapeTexture?.Release();
-            mDetailTexture?.Release();
-        }
-
-        private float min(Vector3 vec)
-        {
-            return Mathf.Min(vec.x, Mathf.Min(vec.y, vec.z));
-        }
-
-        private void sendSphereAreaData(SphereArea sphereArea)
-        {
-            mMaterial.SetVector("_PlanetData", sphereArea.planetData);
-            mMaterial.SetVector("_PlanetCloudThickness", sphereArea.cloudThickness);
-
-            var cam = SceneView.GetAllSceneCameras()[0];
-            mMaterial.SetVector("_CameraUp", cam.transform.up);
-            var camera_height = (cam.transform.position - sphereArea.planetCenter).magnitude;
-
-            ///在云层上
-            if (camera_height > sphereArea.outerRadius)
+            if(mShapeTexture != null)
             {
-                mMaterial.SetInt("_ViewPosition", (int)CameraPos.OutCloud);
+                mShapeTexture.Release();
             }
-            ///在云层中
-            else if (camera_height > sphereArea.innerRadius)
+
+            if (mDetailTexture != null)
             {
-                mMaterial.SetInt("_ViewPosition", (int)CameraPos.InCloud);
-            }
-            ///在云层下
-            else if (camera_height > sphereArea.planetRadius)
-            {
-                mMaterial.SetInt("_ViewPosition", (int)CameraPos.UnderCloud);
-            }
-            else
-            {
-                //GG
-                mMaterial.SetInt("_ViewPosition", (int)CameraPos.UnderGround);
+                mDetailTexture.Release();
             }
         }
 
         // Update is called once per frame
         void Update()
         {
-            mMotionData.update(mDrawArea);
 
-
-            //Debug.Log(mBoxCollider.bounds.min);
-            //Debug.Log(mBoxCollider.bounds.max);
         }
     }
 }

@@ -4,14 +4,16 @@ namespace tezcat.Framework.Utility
 {
     public class TezNoise
     {
-        static System.Func<Vector3, float,  float>[] m_Functions = new System.Func<Vector3, float, float>[]
+        static System.Func<Vector3, int, float>[] mFunctions = new System.Func<Vector3, int, float>[]
         {
             value1D,
             value2D,
             value3D,
             perlin1D,
             perlin2D,
-            perlin3D
+            perlin3D,
+            perlin2DRepeat,
+            perlin3DRepeat,
         };
 
         public enum Function
@@ -23,21 +25,20 @@ namespace tezcat.Framework.Utility
             Perlin1D,
             Perlin2D,
             Perlin3D,
+            Perlin2DRepeat,
+            Perlin3DRepeat,
         }
 
         #region 工具
-        public static int[] hashArray => m_HashArray;
+        public static int[] hashArray => mHashArray;
 
         /// <summary>
         /// 双倍(复制的内容)数组长度
-        /// 用于优化value(X)D中的(point&Mask)运算
-        /// 如果没有双倍长度
-        /// 每次从Array中获取数值时
-        /// 都需要(point&Mask)运算防止index越界
-        /// 这样就优化掉了(point&Mask)运算
-        /// 并且不会出现长度越界的情况
+        /// 用于优化 GradientsX[m_HashArray[h0 + iy0] 算法
+        /// 因为h0+iy0的最大值是255*2
+        /// 没有双倍长度需要在这里&mask才行
         /// </summary>
-        private static int[] m_HashArray = {
+        private static int[] mHashArray = {
             151,160,137, 91, 90, 15,131, 13,201, 95, 96, 53,194,233,  7,225,
             140, 36,103, 30, 69,142,  8, 99, 37,240, 21, 10, 23,190,  6,148,
             247,120,234, 75,  0, 26,197, 62, 94,252,219,203,117, 35, 11, 32,
@@ -73,7 +74,7 @@ namespace tezcat.Framework.Utility
             222,114, 67, 29, 24, 72,243,141,128,195, 78, 66,215, 61,156,180
         };
 
-        private const int m_HashMask = 255;
+        private const int mHashMask = 255;
 
         private static float smooth(float t)
         {
@@ -89,10 +90,20 @@ namespace tezcat.Framework.Utility
         {
             return g.x * x + g.y * y + g.z * z;
         }
+
+        private static float select(float a, float b, bool flag)
+        {
+            return flag ? b : a;
+        }
+
+        private static int select(int a, int b, bool flag)
+        {
+            return flag ? b : a;
+        }
         #endregion
 
         #region 值噪音(随机数)
-        public static float value1D(float point, float frequency)
+        public static float value1D(float point, int frequency)
         {
             ///振动!!!!
             point *= frequency;
@@ -105,14 +116,14 @@ namespace tezcat.Framework.Utility
             var t = point - i0;
 
             ///将获得的参考值的Index归一化到HashArray的长度中
-            i0 &= m_HashMask;
+            i0 &= mHashMask;
 
             ///获得右边参考值的Index
             int i1 = i0 + 1;
 
             ///取得左边点和右边点的参考值
-            int h0 = m_HashArray[i0];
-            int h1 = m_HashArray[i1];
+            int h0 = mHashArray[i0];
+            int h1 = mHashArray[i1];
 
             ///获得平滑的插值系数
             t = smooth(t);
@@ -122,15 +133,15 @@ namespace tezcat.Framework.Utility
             ///取得当前点真正的参考值(Mathf.Lerp(h0, h1, t))
             ///并且转换到0-1之内(除以(1f / m_HashMask))
             ///便获得了平滑的一维随机数
-            return Mathf.Lerp(h0, h1, t) * (1f / m_HashMask);
+            return Mathf.Lerp(h0, h1, t) * (1f / mHashMask);
         }
 
-        public static float value1D(Vector3 point, float frequency)
+        public static float value1D(Vector3 point, int frequency)
         {
             return value1D(point.x, frequency);
         }
 
-        public static float value2D(Vector2 point, float frequency)
+        public static float value2D(Vector2 point, int frequency)
         {
             point *= frequency;
 
@@ -140,43 +151,43 @@ namespace tezcat.Framework.Utility
             var tx = point.x - ix0;
             var ty = point.y - iy0;
 
-            ix0 &= m_HashMask;
-            iy0 &= m_HashMask;
+            ix0 &= mHashMask;
+            iy0 &= mHashMask;
 
             int ix1 = ix0 + 1;
             int iy1 = iy0 + 1;
 
             ///取得线上的值
             ///为了下一步计算面上的值
-            int h0 = m_HashArray[ix0];
-            int h1 = m_HashArray[ix1];
+            int h0 = mHashArray[ix0];
+            int h1 = mHashArray[ix1];
 
             ///计算面上的值
             ///用于插值计算
-            int h00 = m_HashArray[h0 + iy0];
-            int h10 = m_HashArray[h1 + iy0];
-            int h01 = m_HashArray[h0 + iy1];
-            int h11 = m_HashArray[h1 + iy1];
+            int h00 = mHashArray[h0 + iy0];
+            int h10 = mHashArray[h1 + iy0];
+            int h01 = mHashArray[h0 + iy1];
+            int h11 = mHashArray[h1 + iy1];
 
             tx = smooth(tx);
             ty = smooth(ty);
 
             return Mathf.Lerp(Mathf.Lerp(h00, h10, tx)
                 , Mathf.Lerp(h01, h11, tx)
-                , ty) * (1f / m_HashMask);
+                , ty) * (1f / mHashMask);
         }
 
-        public static float value2D(Vector3 point, float frequency)
+        public static float value2D(Vector3 point, int frequency)
         {
             return value2D(new Vector2(point.x, point.y), frequency);
         }
 
-        public static float value3D(Vector3 point, float frequency)
+        public static float value3D(Vector3 point, int frequency)
         {
             return value3D(point, frequency, Vector3.zero);
         }
 
-        public static float value3D(Vector3 point, float frequency, Vector3 offset)
+        public static float value3D(Vector3 point, int frequency, Vector3 offset)
         {
             point *= frequency;
             point += offset;
@@ -188,9 +199,9 @@ namespace tezcat.Framework.Utility
             var ty = point.y - iy0;
             var tz = point.z - iz0;
 
-            ix0 &= m_HashMask;
-            iy0 &= m_HashMask;
-            iz0 &= m_HashMask;
+            ix0 &= mHashMask;
+            iy0 &= mHashMask;
+            iz0 &= mHashMask;
 
             int ix1 = ix0 + 1;
             int iy1 = iy0 + 1;
@@ -198,26 +209,26 @@ namespace tezcat.Framework.Utility
 
             ///计算线上的值
             ///为了下一步计算面上的值
-            int h0 = m_HashArray[ix0];
-            int h1 = m_HashArray[ix1];
+            int h0 = mHashArray[ix0];
+            int h1 = mHashArray[ix1];
 
             ///计算面上的值
             ///为了下一步计算体上的值
-            int h00 = m_HashArray[h0 + iy0];
-            int h10 = m_HashArray[h1 + iy0];
-            int h01 = m_HashArray[h0 + iy1];
-            int h11 = m_HashArray[h1 + iy1];
+            int h00 = mHashArray[h0 + iy0];
+            int h10 = mHashArray[h1 + iy0];
+            int h01 = mHashArray[h0 + iy1];
+            int h11 = mHashArray[h1 + iy1];
 
             ///计算体上的值
             ///用于插值计算
-            int h000 = m_HashArray[h00 + iz0];
-            int h100 = m_HashArray[h10 + iz0];
-            int h010 = m_HashArray[h01 + iz0];
-            int h110 = m_HashArray[h11 + iz0];
-            int h001 = m_HashArray[h00 + iz1];
-            int h101 = m_HashArray[h10 + iz1];
-            int h011 = m_HashArray[h01 + iz1];
-            int h111 = m_HashArray[h11 + iz1];
+            int h000 = mHashArray[h00 + iz0];
+            int h100 = mHashArray[h10 + iz0];
+            int h010 = mHashArray[h01 + iz0];
+            int h110 = mHashArray[h11 + iz0];
+            int h001 = mHashArray[h00 + iz1];
+            int h101 = mHashArray[h10 + iz1];
+            int h011 = mHashArray[h01 + iz1];
+            int h111 = mHashArray[h11 + iz1];
 
             tx = smooth(tx);
             ty = smooth(ty);
@@ -226,16 +237,16 @@ namespace tezcat.Framework.Utility
             return Mathf.Lerp(
                 Mathf.Lerp(Mathf.Lerp(h000, h100, tx), Mathf.Lerp(h010, h110, tx), ty)
                 , Mathf.Lerp(Mathf.Lerp(h001, h101, tx), Mathf.Lerp(h011, h111, tx), ty)
-                , tz) * (1f / m_HashMask);
+                , tz) * (1f / mHashMask);
         }
         #endregion
 
         #region 柏林噪音(随机数)
-        private static float[] m_Gradients1D = { 1f, -1f };
-        private const int m_GradientsMask1D = 1;
+        private static float[] mGradients1D = { 1f, -1f };
+        private const int mGradientsMask1D = 1;
 
-        public static Vector2[] gradients2D => m_Gradients2D;
-        private static Vector2[] m_Gradients2D =
+        public static Vector2[] gradients2D => mGradients2D;
+        private static Vector2[] mGradients2D =
         {
             new Vector2( 1f, 0f),
             new Vector2(-1f, 0f),
@@ -246,11 +257,11 @@ namespace tezcat.Framework.Utility
             new Vector2( 1f,-1f).normalized,
             new Vector2(-1f,-1f).normalized
         };
-        private const int m_GradientsMask2D = 7;
+        private const int mGradientsMask2D = 7;
         private static float Sqrt2 = Mathf.Sqrt(2f);
 
-        public static Vector3[] gradients3D => m_Gradients3D;
-        private static Vector3[] m_Gradients3D =
+        public static Vector3[] gradients3D => mGradients3D;
+        private static Vector3[] mGradients3D =
         {
             new Vector3( 1f, 1f, 0f),
             new Vector3(-1f, 1f, 0f),
@@ -264,26 +275,26 @@ namespace tezcat.Framework.Utility
             new Vector3( 0f,-1f, 1f),
             new Vector3( 0f, 1f,-1f),
             new Vector3( 0f,-1f,-1f),
-
+            
             new Vector3( 1f, 1f, 0f),
             new Vector3(-1f, 1f, 0f),
             new Vector3( 0f,-1f, 1f),
             new Vector3( 0f,-1f,-1f)
         };
-        private const int m_GradientsMask3D = 15;
+        private const int mGradientsMask3D = 15;
 
-        public static float perlin1D(float point, float frequency)
+        public static float perlin1D(float point, int frequency)
         {
             point *= frequency;
             int i0 = Mathf.FloorToInt(point);
             var t0 = point - i0;
             var t1 = t0 - 1;
-            i0 &= m_HashMask;
+            i0 &= mHashMask;
 
             int i1 = i0 + 1;
 
-            float g0 = m_Gradients1D[m_HashArray[i0] & m_GradientsMask1D];
-            float g1 = m_Gradients1D[m_HashArray[i1] & m_GradientsMask1D];
+            float g0 = mGradients1D[mHashArray[i0] & mGradientsMask1D];
+            float g1 = mGradients1D[mHashArray[i1] & mGradientsMask1D];
 
             float v0 = g0 * t0;
             float v1 = g1 * t1;
@@ -293,59 +304,127 @@ namespace tezcat.Framework.Utility
             return Mathf.Lerp(v0, v1, t) * 2f;
         }
 
-        public static float perlin1D(Vector3 point, float frequency)
+        public static float perlin1D(Vector3 point, int frequency)
         {
             return perlin1D(point.x, frequency);
         }
 
-        public static float perlin2D(Vector2 point, float frequency)
+        public static float perlin2D(Vector2 point, int frequency)
         {
             point *= frequency;
 
             int ix0 = Mathf.FloorToInt(point.x);
             int iy0 = Mathf.FloorToInt(point.y);
 
+            //获得差值,小数部分,即相对坐标位置
             var tx0 = point.x - ix0;
             var ty0 = point.y - iy0;
 
+            //减去1,是为了得到当前点到(1,x)和(x, 1)的向量
             var tx1 = tx0 - 1f;
             var ty1 = ty0 - 1f;
+            //这里是分开计算,理论算法为
+            //因为ix0-ix1之间的距离是1,所以等价于-1
+            //point - vec(ix0, iy0) = (tx0, ty0) - vec(0 ,0) = (tx0, ty0)
+            //point - vec(ix1, iy0) = (tx0, ty0) - vec(1, 0) = (tx1, ty0)
+            //point - vec(ix0, iy1) = (tx0, ty0) - vec(0, 1) = (tx0, ty1)
+            //point - vec(ix1, iy1) = (tx0, ty0) - vec(1, 1) = (tx1, ty1)
 
-            ix0 &= m_HashMask;
-            iy0 &= m_HashMask;
 
-            int ix1 = ix0 + 1;
-            int iy1 = iy0 + 1;
+            ix0 &= mHashMask;
+            iy0 &= mHashMask;
 
-            int h0 = m_HashArray[ix0];
-            int h1 = m_HashArray[ix1];
+            int ix1 = (ix0 + 1) & mHashMask;
+            int iy1 = (iy0 + 1) & mHashMask;
 
-            var g00 = m_Gradients2D[m_HashArray[h0 + iy0] & m_GradientsMask2D];
-            var g10 = m_Gradients2D[m_HashArray[h1 + iy0] & m_GradientsMask2D];
-            var g01 = m_Gradients2D[m_HashArray[h0 + iy1] & m_GradientsMask2D];
-            var g11 = m_Gradients2D[m_HashArray[h1 + iy1] & m_GradientsMask2D];
+            //获得x轴随机数
+            int h0 = mHashArray[ix0];
+            int h1 = mHashArray[ix1];
 
+            //获得晶格点上的随机向量
+            var g00 = mGradients2D[/*获得Y轴随机数*/mHashArray[h0 + iy0] & mGradientsMask2D];
+            var g10 = mGradients2D[/*获得Y轴随机数*/mHashArray[h1 + iy0] & mGradientsMask2D];
+            var g01 = mGradients2D[/*获得Y轴随机数*/mHashArray[h0 + iy1] & mGradientsMask2D];
+            var g11 = mGradients2D[/*获得Y轴随机数*/mHashArray[h1 + iy1] & mGradientsMask2D];
+
+            //计算随机向量贡献值
             float v00 = dot(g00, tx0, ty0);
             float v10 = dot(g10, tx1, ty0);
             float v01 = dot(g01, tx0, ty1);
             float v11 = dot(g11, tx1, ty1);
 
+            //将线性比例平滑之后计算成插值系数
             float tx = smooth(tx0);
             float ty = smooth(ty0);
 
-            return Mathf.Lerp(Mathf.Lerp(v00, v10, tx)
-                , Mathf.Lerp(v01, v11, tx)
-                , ty) * Sqrt2;
+            return Mathf.Lerp(
+                Mathf.Lerp(v00, v10, tx), //LeftBottom插值到RightBottom
+                Mathf.Lerp(v01, v11, tx), //LeftTop插值到RightTop
+                ty); // Bottom插值到Top
         }
 
-        public static float perlin2D(Vector3 point, float frequency)
+        public static float perlin2DRepeat(Vector3 point, int frequency)
+        {
+            point *= frequency;
+
+            int ix0 = Mathf.FloorToInt(point.x);
+            int iy0 = Mathf.FloorToInt(point.y);
+
+            //获得差值,小数部分,即相对坐标位置
+            var tx0 = point.x - ix0;
+            var ty0 = point.y - iy0;
+
+            //减去1,是为了得到当前点到(1,x)和(x, 1)的向量
+            var tx1 = tx0 - 1f;
+            var ty1 = ty0 - 1f;
+
+            ix0 %= frequency;
+            iy0 %= frequency;
+
+            ix0 &= mHashMask;
+            iy0 &= mHashMask;
+
+            int ix1 = (ix0 + 1) % frequency;
+            int iy1 = (iy0 + 1) % frequency;
+
+            ix1 &= mHashMask;
+            iy1 &= mHashMask;
+
+            //获得x轴随机数
+            int h0 = mHashArray[ix0];
+            int h1 = mHashArray[ix1];
+
+            //获得晶格点上的随机向量
+            var g00 = mGradients2D[/*获得Y轴随机数*/mHashArray[h0 + iy0] & mGradientsMask2D];
+            var g10 = mGradients2D[/*获得Y轴随机数*/mHashArray[h1 + iy0] & mGradientsMask2D];
+            var g01 = mGradients2D[/*获得Y轴随机数*/mHashArray[h0 + iy1] & mGradientsMask2D];
+            var g11 = mGradients2D[/*获得Y轴随机数*/mHashArray[h1 + iy1] & mGradientsMask2D];
+
+            //计算随机向量贡献值
+            float v00 = dot(g00, tx0, ty0);
+            float v10 = dot(g10, tx1, ty0);
+            float v01 = dot(g01, tx0, ty1);
+            float v11 = dot(g11, tx1, ty1);
+
+            //将线性比例平滑之后计算成插值系数
+            float tx = smooth(tx0);
+            float ty = smooth(ty0);
+
+            return Mathf.Lerp(
+                Mathf.Lerp(v00, v10, tx), //LeftBottom插值到RightBottom
+                Mathf.Lerp(v01, v11, tx), //LeftTop插值到RightTop
+                ty); // Bottom插值到Top
+        }
+
+        public static float perlin2D(Vector3 point, int frequency)
         {
             return perlin2D(new Vector2(point.x, point.y), frequency);
         }
 
-        public static float perlin3D(Vector3 point, float frequency)
+        public static float perlin3D(Vector3 point, int frequency)
         {
             point *= frequency;
+
             int ix0 = Mathf.FloorToInt(point.x);
             int iy0 = Mathf.FloorToInt(point.y);
             int iz0 = Mathf.FloorToInt(point.z);
@@ -357,30 +436,100 @@ namespace tezcat.Framework.Utility
             var ty1 = ty0 - 1f;
             var tz1 = tz0 - 1f;
 
-            ix0 &= m_HashMask;
-            iy0 &= m_HashMask;
-            iz0 &= m_HashMask;
+            ix0 &= mHashMask;
+            iy0 &= mHashMask;
+            iz0 &= mHashMask;
 
             int ix1 = ix0 + 1;
             int iy1 = iy0 + 1;
             int iz1 = iz0 + 1;
 
-            int h0 = m_HashArray[ix0];
-            int h1 = m_HashArray[ix1];
+            int h0 = mHashArray[ix0];
+            int h1 = mHashArray[ix1];
 
-            int h00 = m_HashArray[h0 + iy0];
-            int h10 = m_HashArray[h1 + iy0];
-            int h01 = m_HashArray[h0 + iy1];
-            int h11 = m_HashArray[h1 + iy1];
+            int h00 = mHashArray[h0 + iy0];
+            int h10 = mHashArray[h1 + iy0];
+            int h01 = mHashArray[h0 + iy1];
+            int h11 = mHashArray[h1 + iy1];
 
-            var g000 = m_Gradients3D[m_HashArray[h00 + iz0] & m_GradientsMask3D];
-            var g100 = m_Gradients3D[m_HashArray[h10 + iz0] & m_GradientsMask3D];
-            var g010 = m_Gradients3D[m_HashArray[h01 + iz0] & m_GradientsMask3D];
-            var g110 = m_Gradients3D[m_HashArray[h11 + iz0] & m_GradientsMask3D];
-            var g001 = m_Gradients3D[m_HashArray[h00 + iz1] & m_GradientsMask3D];
-            var g101 = m_Gradients3D[m_HashArray[h10 + iz1] & m_GradientsMask3D];
-            var g011 = m_Gradients3D[m_HashArray[h01 + iz1] & m_GradientsMask3D];
-            var g111 = m_Gradients3D[m_HashArray[h11 + iz1] & m_GradientsMask3D];
+            var g000 = mGradients3D[mHashArray[h00 + iz0] & mGradientsMask3D];
+            var g100 = mGradients3D[mHashArray[h10 + iz0] & mGradientsMask3D];
+            var g010 = mGradients3D[mHashArray[h01 + iz0] & mGradientsMask3D];
+            var g110 = mGradients3D[mHashArray[h11 + iz0] & mGradientsMask3D];
+            var g001 = mGradients3D[mHashArray[h00 + iz1] & mGradientsMask3D];
+            var g101 = mGradients3D[mHashArray[h10 + iz1] & mGradientsMask3D];
+            var g011 = mGradients3D[mHashArray[h01 + iz1] & mGradientsMask3D];
+            var g111 = mGradients3D[mHashArray[h11 + iz1] & mGradientsMask3D];
+
+            float v000 = dot(g000, tx0, ty0, tz0);
+            float v100 = dot(g100, tx1, ty0, tz0);
+            float v010 = dot(g010, tx0, ty1, tz0);
+            float v110 = dot(g110, tx1, ty1, tz0);
+            float v001 = dot(g001, tx0, ty0, tz1);
+            float v101 = dot(g101, tx1, ty0, tz1);
+            float v011 = dot(g011, tx0, ty1, tz1);
+            float v111 = dot(g111, tx1, ty1, tz1);
+
+            float tx = smooth(tx0);
+            float ty = smooth(ty0);
+            float tz = smooth(tz0);
+
+            return Mathf.Lerp(
+                Mathf.Lerp(Mathf.Lerp(v000, v100, tx), Mathf.Lerp(v010, v110, tx), ty),
+                Mathf.Lerp(Mathf.Lerp(v001, v101, tx), Mathf.Lerp(v011, v111, tx), ty),
+                tz);
+        }
+
+        public static float perlin3DRepeat(Vector3 point, int frequency)
+        {
+            point *= frequency;
+
+            int ix0 = Mathf.FloorToInt(point.x);
+            int iy0 = Mathf.FloorToInt(point.y);
+            int iz0 = Mathf.FloorToInt(point.z);
+
+            var tx0 = point.x - ix0;
+            var ty0 = point.y - iy0;
+            var tz0 = point.z - iz0;
+            var tx1 = tx0 - 1f;
+            var ty1 = ty0 - 1f;
+            var tz1 = tz0 - 1f;
+
+            ix0 %= frequency;
+            ix0 = select(ix0, ix0 + frequency, ix0 < 0);
+            iy0 %= frequency;
+            iy0 = select(iy0, iy0 + frequency, iy0 < 0);
+            iz0 %= frequency;
+            iz0 = select(iz0, iz0 + frequency, iz0 < 0);
+
+            ix0 &= mHashMask;
+            iy0 &= mHashMask;
+            iz0 &= mHashMask;
+
+            int ix1 = (ix0 + 1) % frequency;
+            int iy1 = (iy0 + 1) % frequency;
+            int iz1 = (iz0 + 1) % frequency;
+
+            ix1 &= mHashMask;
+            iy1 &= mHashMask;
+            iz1 &= mHashMask;
+
+            int h0 = mHashArray[ix0];
+            int h1 = mHashArray[ix1];
+
+            int h00 = mHashArray[h0 + iy0];
+            int h10 = mHashArray[h1 + iy0];
+            int h01 = mHashArray[h0 + iy1];
+            int h11 = mHashArray[h1 + iy1];
+
+            var g000 = mGradients3D[mHashArray[h00 + iz0] & mGradientsMask3D];
+            var g100 = mGradients3D[mHashArray[h10 + iz0] & mGradientsMask3D];
+            var g010 = mGradients3D[mHashArray[h01 + iz0] & mGradientsMask3D];
+            var g110 = mGradients3D[mHashArray[h11 + iz0] & mGradientsMask3D];
+            var g001 = mGradients3D[mHashArray[h00 + iz1] & mGradientsMask3D];
+            var g101 = mGradients3D[mHashArray[h10 + iz1] & mGradientsMask3D];
+            var g011 = mGradients3D[mHashArray[h01 + iz1] & mGradientsMask3D];
+            var g111 = mGradients3D[mHashArray[h11 + iz1] & mGradientsMask3D];
 
             float v000 = dot(g000, tx0, ty0, tz0);
             float v100 = dot(g100, tx1, ty0, tz0);
@@ -413,39 +562,43 @@ namespace tezcat.Framework.Utility
         /// <param name="lacunarity"></param>
         /// <param name="persistence"></param>
         /// <returns></returns>
-        public static float sum(Function method, Vector3 point, float frequency, int octaves, float lacunarity, float persistence)
+        public static float sum(Function method, Vector3 point, int frequency, int octaves, int lacunarity, float persistence)
         {
-            var function = m_Functions[(int)method];
+            var function = mFunctions[(int)method];
 
-            float sum = function(point, frequency);
+            float sum = 0;
             float amplitude = 1f;
-            float range = 1f;
-            for (int o = 1; o < octaves; o++)
+            float sum_amplitude = 1f;
+
+            for (int o = 0; o < octaves; o++)
             {
+                sum += function(point, frequency) * amplitude;
+
+                sum_amplitude += amplitude;
                 frequency *= lacunarity;
                 amplitude *= persistence;
-                range += amplitude;
-                sum += function(point, frequency) * amplitude;
             }
-            return sum / range;
+            return sum / sum_amplitude;
         }
 
-        public static float sumWithUnityPerlinNoise(Vector3 point, float frequency, int octaves, float lacunarity, float persistence)
+        public static float sumWithUnityPerlinNoise(Vector3 point, int frequency, int octaves, int lacunarity, float persistence)
         {
-            var fp = point * frequency;
-
-            float sum = Mathf.PerlinNoise(fp.x, fp.y);
+            float sum = 0;
             float amplitude = 1f;
-            float range = 1f;
-            for (int o = 1; o < octaves; o++)
+            float sum_amplitude = 1f;
+            Vector3 p;
+
+            for (int o = 0; o < octaves; o++)
             {
+                p = point * frequency;
+                sum += Mathf.PerlinNoise(p.x, p.y);
+
+                sum_amplitude += amplitude;
                 frequency *= lacunarity;
                 amplitude *= persistence;
-                range += amplitude;
-                fp = point * frequency;
-                sum += Mathf.PerlinNoise(fp.x, fp.y) * amplitude;
             }
-            return sum / range;
+
+            return sum / sum_amplitude;
         }
         #endregion
     }

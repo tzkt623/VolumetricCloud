@@ -57,7 +57,7 @@
 				if (_DrawAreaIndex == AREA_BOX)
 				{
 					edge = calculateEdgeForBox(pos, _BoxMin, _BoxMax);
-					weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, (pos.xz - _BoxMin.xz) / (_BoxMax.xz - _BoxMin.xz), 0).r * _CoverageRate;
+					weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, (pos.xz - _BoxMin.xz) / (_BoxMax.xz - _BoxMin.xz), 0).r * _Coverage;
 				}
 				else
 				{
@@ -65,7 +65,7 @@
 
 					if (_DrawAreaIndex == AREA_HORIZON_LINE)
 					{
-						weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, (pos.xz * 100 / (_PlanetData.w + _PlanetCloudThickness.x) + 0.5), 0).r;
+						weather = _WeatherTex2D.SampleLevel(sampler_WeatherTex2D, (pos.xz * 100 / (_PlanetData.w + _CloudData.x) + 0.5), 0).r;
 					}
 					else
 					{
@@ -84,7 +84,7 @@
 				//shape *= remap(heightRate, 0.5, 1.0, 0.5, 0.0);
 				//shape *= getCloudDatas(heightRate, 1.0) / heightRate;
 
-				float cloud_coverage = weather * _CoverageRate;
+				float cloud_coverage = weather * _Coverage;
 				float shape_with_coverage = remapPositive(shape, cloud_coverage, 1.0, 0.0, 1.0);
 				shape_with_coverage *= cloud_coverage;
 
@@ -246,7 +246,7 @@
 
 					float2 col_params = calculateFinalColor(ray_o, ray_dir, light_dir, linear_eye_depth, i.uv);
 
-					float3 col = tex2D(_ScreenTex, i.uv);
+					float3 col = tex2D(_MainTex, i.uv);
 					float3 cloud_col = (1 - col_params.x)
 						* _EnergyStrength.z 
 						* _LightColor0

@@ -1,4 +1,7 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
+using UnityEngine.Experimental.Rendering;
+using UnityEngine.Rendering;
 
 namespace tezcat.Framework.Exp
 {
@@ -40,14 +43,14 @@ namespace tezcat.Framework.Exp
                     int begin_x = x * mGridLength;
                     int begin_y = y * mGridLength;
 
-                    var pos_x = Random.Range(begin_x, begin_x + mGridLength);
-                    var pos_y = Random.Range(begin_y, begin_y + mGridLength);
+                    var pos_x = UnityEngine.Random.Range(begin_x, begin_x + mGridLength);
+                    var pos_y = UnityEngine.Random.Range(begin_y, begin_y + mGridLength);
 
                     mMarkPointArray2D[x + y * mGridCount] = new Vector2Int(pos_x, pos_y);
                 }
             }
 
-            mComputeBuffer = new ComputeBuffer(mGridCount * mGridLength, sizeof(int) * 2);
+            mComputeBuffer = new ComputeBuffer(mGridCount * mGridCount, sizeof(int) * 2);
             mComputeBuffer.SetData(mMarkPointArray2D);
             shader.SetBuffer(kernel, $"in{mMarkName}WLMarkPoints", mComputeBuffer);
 
@@ -92,16 +95,16 @@ namespace tezcat.Framework.Exp
                     {
                         int begin_x = x * mGridLength;
 
-                        var pos_x = Random.Range(begin_x, begin_x + mGridLength);
-                        var pos_y = Random.Range(begin_y, begin_y + mGridLength);
-                        var pos_z = Random.Range(begin_z, begin_z + mGridLength);
+                        var pos_x = UnityEngine.Random.Range(begin_x, begin_x + mGridLength);
+                        var pos_y = UnityEngine.Random.Range(begin_y, begin_y + mGridLength);
+                        var pos_z = UnityEngine.Random.Range(begin_z, begin_z + mGridLength);
 
                         array[x + y_offset + z_offset] = new Vector3Int(pos_x, pos_y, pos_z);
                     }
                 }
             }
 
-            mComputeBuffer = new ComputeBuffer(mGridCount * mGridLength * mGridLength, sizeof(int) * 3);
+            mComputeBuffer = new ComputeBuffer(mGridCount * mGridCount * mGridCount, sizeof(int) * 3);
             mComputeBuffer.SetData(array);
             shader.SetBuffer(kernel, $"in{mMarkName}WLMarkPoints", mComputeBuffer);
 
@@ -178,9 +181,9 @@ namespace tezcat.Framework.Exp
                     {
                         int begin_x = x * grid_length;
 
-                        var pos_x = Random.Range(begin_x, begin_x + grid_length);
-                        var pos_y = Random.Range(begin_y, begin_y + grid_length);
-                        var pos_z = Random.Range(begin_z, begin_z + grid_length);
+                        var pos_x = UnityEngine.Random.Range(begin_x, begin_x + grid_length);
+                        var pos_y = UnityEngine.Random.Range(begin_y, begin_y + grid_length);
+                        var pos_z = UnityEngine.Random.Range(begin_z, begin_z + grid_length);
 
                         array[x + y_offset + z_offset] = new Vector3Int(pos_x, pos_y, pos_z);
                     }
@@ -202,6 +205,91 @@ namespace tezcat.Framework.Exp
             }
 
             mGridCountBuffer?.Release();
+        }
+    }
+
+    public static class ShaderExtension
+    {
+        public static int[] generateIDs(params string[] names)
+        {
+            int[] ids = new int[names.Length];
+            for (int i = 0; i < names.Length; i++)
+            {
+                ids[i] = Shader.PropertyToID(names[i]);
+            }
+
+            return ids;
+        }
+    }
+
+    [System.Serializable]
+    public class WorleyNoise2 : BaseData
+    {
+        [SerializeField]
+        private ComputeShader mShader;
+        [SerializeField]
+        private bool mFilp = false;
+        [SerializeField]
+        private int mResolution = 128;
+        [SerializeField]
+        private int mCellCount = 4;
+        [SerializeField]
+        private Vector3 mOffset;
+        [SerializeField]
+        private Vector3 mPowFactor;
+        [SerializeField]
+        private float mAmplitudeFactor = 0.5f;
+
+        RenderTexture mTexture = null;
+        int mKernel = -1;
+
+        public RenderTexture texture { get { return mTexture; } }
+        public event Action<RenderTexture> evtTextureCreated;
+
+        public override void init()
+        {
+            base.init();
+            mKernel = mShader.FindKernel("CSMain");
+            this.generate();
+        }
+
+        public override void initIDs()
+        {
+            this.generateIDs("outWorleyNoiseTex3D",
+                "inResolution",
+                "inFlip",
+                "inCellCount",
+                "inOffset1",
+                "inPowFactor");
+        }
+
+        public void generate()
+        {
+            mTexture?.Release();
+            mTexture = new RenderTexture(mResolution, mResolution, 0, GraphicsFormat.R16G16B16A16_SFloat)
+            {
+                dimension = TextureDimension.Tex3D,
+                volumeDepth = mResolution,
+                wrapMode = TextureWrapMode.Repeat,
+                filterMode = FilterMode.Bilinear,
+                enableRandomWrite = true,
+                useMipMap = false,
+                autoGenerateMips = false
+            };
+            mTexture.Create();
+            evtTextureCreated?.Invoke(mTexture);
+
+            mShader.SetTexture(mKernel, mIDs[0], mTexture);
+            mShader.SetInt(mIDs[1], mResolution);
+        }
+
+        public override void sendToGPU()
+        {
+            mShader.SetBool(mIDs[2], mFilp);
+            mShader.SetFloat(mIDs[3], mCellCount);
+            mShader.SetVector(mIDs[4], new Vector4(mOffset.x, mOffset.y, mOffset.z, mAmplitudeFactor));
+            mShader.SetVector(mIDs[5], new Vector4((int)mPowFactor.x, (int)mPowFactor.y, (int)mPowFactor.z, 0.0f));
+            mShader.Dispatch(mKernel, mResolution / 8, mResolution / 8, mResolution / 2);
         }
     }
 }

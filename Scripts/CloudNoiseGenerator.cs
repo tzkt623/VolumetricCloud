@@ -1,7 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using tezcat.Framework.Utility;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
@@ -28,16 +25,36 @@ namespace tezcat.Framework.Exp
         }
 
         public event System.Action<RenderTexture> onTextureCreated;
-        public RenderTexture shapeTexture => mShapeRenderTexture;
+        public RenderTexture shapeTexture
+        {
+            get
+            {
+                if (mUseNoise)
+                {
+                    return mShapeRenderTexture;
+                }
+                else
+                {
+                    return mTexture2To3.renderTexture;
+                }
+            }
+        }
+
         public RenderTexture perlinNoiseTexture => mShapePerlinNoiseTexture;
 
         public ComputeShader mComputeShader;
         public DetailNoise mDetailNoise;
 
         public bool mUpdate = false;
+        public bool mUseNoise = true;
         public int mResolution = 64;
         public PerlinData mPerlinNoise;
         public WorleyGroupData mWorleyNoise;
+
+        public ConvertTex2DTo3D mTexture2To3;
+
+        private bool mInitNoise = false;
+        private bool mInitTexture = false;
 
         [Header("Viewer")]
         public Shader mViewerShader;
@@ -52,7 +69,58 @@ namespace tezcat.Framework.Exp
 
         private void Start()
         {
-            this.intiData();
+//             const int MASK = 255;
+//             Debug.Log(-348 % MASK);
+//             Debug.Log(-348 & MASK);
+// 
+//             for (int i = 0; i < 200; i++)
+//             {
+//                 Debug.Log($"Exp[{i}] {Mathf.Exp(-i)}");
+//             }
+
+            if (mUseNoise)
+            {
+                this.intiCloudNoise();
+            }
+            else
+            {
+                this.initCloudTexture();
+            }
+        }
+
+        public void useTexture()
+        {
+            if (!mInitTexture)
+            {
+                this.initCloudTexture();
+            }
+            else
+            {
+                onTextureCreated?.Invoke(mTexture2To3.renderTexture);
+            }
+        }
+
+        public void useNoise()
+        {
+            if (!mInitNoise)
+            {
+                this.intiCloudNoise();
+            }
+            else
+            {
+                onTextureCreated?.Invoke(mShapeRenderTexture);
+            }
+        }
+
+        private void initCloudTexture()
+        {
+            if (mInitTexture)
+            {
+                return;
+            }
+
+            mInitTexture = true;
+            onTextureCreated?.Invoke(mTexture2To3.create());
         }
 
         private void OnDestroy()
@@ -60,8 +128,15 @@ namespace tezcat.Framework.Exp
             mShapeRenderTexture?.Release();
         }
 
-        private void intiData()
+        private void intiCloudNoise()
         {
+            if (mInitNoise)
+            {
+                return;
+            }
+
+            mInitNoise = true;
+
             PerlinNoiseData.initSharedData();
 
             mDetailNoise.onTextureCreated += onDetailNoiseTextureCreated;
@@ -81,7 +156,7 @@ namespace tezcat.Framework.Exp
                 filterMode = FilterMode.Bilinear,
                 enableRandomWrite = true,
                 useMipMap = true,
-                autoGenerateMips = true
+                autoGenerateMips = false
             };
             mShapeRenderTexture.Create();
             mComputeShader.SetTexture(mCSKernel, "outShapeTex3D", mShapeRenderTexture);
@@ -93,7 +168,7 @@ namespace tezcat.Framework.Exp
                 dimension = TextureDimension.Tex3D,
                 wrapMode = TextureWrapMode.Repeat,
                 filterMode = FilterMode.Bilinear,
-                enableRandomWrite = true,
+                enableRandomWrite = true
             };
             mShapePerlinNoiseTexture.Create();
             mComputeShader.SetTexture(mCSKernel, "outShapePerlinNoiseTex3D", mShapePerlinNoiseTexture);
@@ -112,6 +187,12 @@ namespace tezcat.Framework.Exp
             mPerlinNosieRenderer.material.SetTexture("_ShapeTex3D", mShapePerlinNoiseTexture);
 
             mComputeShader.Dispatch(mCSKernel, mResolution / 8, mResolution / 8, mResolution / mCSThreadZ);
+            mShapeRenderTexture.GenerateMips();
+        }
+
+        private void evtWorleyTex3DCreated(RenderTexture tex)
+        {
+
         }
 
         private void onDetailNoiseTextureCreated(RenderTexture tex)
@@ -124,17 +205,22 @@ namespace tezcat.Framework.Exp
 
         private void Update()
         {
-            if (mUpdate)
-            {
-                mPerlinNoise.sendToGPU(mCSKernel, mComputeShader);
-                mWorleyNoise.sendToGPU(mCSKernel, mComputeShader);
 
-                mComputeShader.Dispatch(mCSKernel, mResolution / 8, mResolution / 8, mResolution / mCSThreadZ);
-            }
-
-            for (int i = 0; i < mRenderers.Length; i++)
+            if (mUseNoise)
             {
-                mRenderers[i].material.SetInt("_NoiseType", i);
+                if (mUpdate)
+                {
+                    mPerlinNoise.sendToGPU(mCSKernel, mComputeShader);
+                    mWorleyNoise.sendToGPU(mCSKernel, mComputeShader);
+
+                    mComputeShader.Dispatch(mCSKernel, mResolution / 8, mResolution / 8, mResolution / mCSThreadZ);
+                    mShapeRenderTexture.GenerateMips();
+                }
+
+                for (int i = 0; i < mRenderers.Length; i++)
+                {
+                    mRenderers[i].material.SetInt("_NoiseType", i);
+                }
             }
         }
     }

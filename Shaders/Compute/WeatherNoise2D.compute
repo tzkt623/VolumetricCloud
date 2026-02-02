@@ -1,0 +1,47 @@
+﻿#pragma kernel CSMain
+
+#include "../Head/PerlinNoise.cginc"
+#include "../Head/Function.cginc"
+
+RWTexture2D<float4> outPerlinNoiseTex2D;
+
+int inPerlinData1[4];
+float4 inPerlinData2;
+
+#define Resolution inPerlinData1[0]
+#define Octave inPerlinData1[1]
+#define Frequency inPerlinData1[2]
+#define Lacunarity inPerlinData1[3]
+#define Persistence inPerlinData2.w
+
+#define Offset inPerlinData2.xy
+#define Threshold inPerlinData2.z
+
+float calculatePerlinNoise(in float2 pos)
+{    
+    int freq = Frequency;
+    float strength = 1.0f;
+    float sum_strength = 0;
+    float noise = 0;
+    for (int o = 0; o < Octave; o++)
+    {
+        noise += pn2D(pos, freq) * strength;
+        sum_strength += strength;
+
+        freq *= Lacunarity;
+        strength *= Persistence;
+    }
+
+    noise /= sum_strength;
+    
+    return noise;
+}
+
+[numthreads(8, 8, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    float2 pos = id.xy / (float)Resolution;
+    float perlin = calculatePerlinNoise(pos + Offset) - Threshold;
+    perlin = saturate(perlin) / (1 - Threshold);
+    outPerlinNoiseTex2D[id.xy] = perlin;
+}

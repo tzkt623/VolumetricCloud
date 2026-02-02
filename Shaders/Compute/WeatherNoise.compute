@@ -4,7 +4,7 @@
 #include "../Head/WorleyNoise.cginc"
 #include "../Head/Function.cginc"
 
-RWTexture2D<float4> outWeatherTex2D;
+RWTexture2D<float2> outWeatherTex2D;
 StructuredBuffer<int2> inCvgMapWLMarkPoints;
 
 int inResolution;
@@ -22,8 +22,8 @@ float inCvgMapWLFrequency;
 //  perlin Perlin
 //
 int inCvgMapPLOctave;
-float inCvgMapPLFrequency;
-float inCvgMapPLLacunarity;
+int inCvgMapPLFrequency;
+int inCvgMapPLLacunarity;
 float inCvgMapPLPersistence;
 float2 inCvgMapPLOffset;
 
@@ -33,8 +33,8 @@ float2 inCvgMapPLOffset;
 //  TypeMap
 //
 int inTypeIndexMapPLOctave;
-float inTypeIndexMapPLFrequency;
-float inTypeIndexMapPLLacunarity;
+int inTypeIndexMapPLFrequency;
+int inTypeIndexMapPLLacunarity;
 float inTypeIndexMapPLPersistence;
 float2 inTypeIndexMapPLOffset;
 
@@ -71,14 +71,14 @@ float calculateCvgWLMap(in StructuredBuffer<int2> samplePoints
 }
 float calculateCvgPLMap(in float2 pos)
 {
-	float freq = floor(inCvgMapPLFrequency);
+	int freq = inCvgMapPLFrequency;
 	float strength = 1.0f;
 	float sum_strength = 0;
 	float noise = 0;
 
 	for (int o = 0; o < inCvgMapPLOctave; o++)
 	{
-		noise += pn2D(pos * freq + inCvgMapPLOffset, freq) * strength;
+		noise += pn2D(pos + inCvgMapPLOffset, freq) * strength;
 		sum_strength += strength;
 
 		freq *= inCvgMapPLLacunarity;
@@ -93,14 +93,14 @@ float calculateCvgPLMap(in float2 pos)
 
 float calculateTypeMap(in float2 pos)
 {
-	float freq = floor(inTypeIndexMapPLFrequency);
+	int freq = inTypeIndexMapPLFrequency;
 	float strength = 1.0f;
 	float sum_strength = 0;
 	float noise = 0;
 
 	for (int o = 0; o < inTypeIndexMapPLOctave; o++)
 	{
-		noise += pn2D(pos * freq + inTypeIndexMapPLOffset, freq) * strength;
+		noise += pn2D(pos + inTypeIndexMapPLOffset, freq) * strength;
 		sum_strength += strength;
 
 		freq *= inTypeIndexMapPLLacunarity;
@@ -109,8 +109,14 @@ float calculateTypeMap(in float2 pos)
 
 	noise /= sum_strength;
 	noise = noise * 0.5f + 0.5f;
+	return noise;
+	//noise *= 1.2f;
+	//noise = saturate(noise);
 
-    return noise;
+	//float a = saturate(remap(noise, 0.7, 1.0, 0.9, 1.0));
+	//float b = saturate(remap(noise, 0.3, 0.0, 0.1, 0.0));
+
+    //return (a + b) / 2;
 }
 
 [numthreads(8, 8, 1)]
@@ -121,10 +127,10 @@ void main2D(uint3 id : SV_DispatchThreadID)
     float perlin = calculateCvgPLMap(pos);
 	float worley = calculateCvgWLMap(inCvgMapWLMarkPoints, pos, inCvgMapWLFrequency, 3, inCvgMapWLGridCount, inCvgMapWLFlip);
 
-	float noise = worley + perlin * (1 - worley);
-    noise = remap(noise, inThreshold, 1.0, 0.0, 1.0);
+	float cvg = worley + perlin * (1 - worley);
+	cvg = saturate( remap(cvg, inThreshold, 1.0, 0.0, 1.0));
 
-    float TypeMap = calculateTypeMap(pos);
+    float type = calculateTypeMap(pos);
 
-    outWeatherTex2D[id.xy] = float4(noise, TypeMap, 0.0f, 0.0f);
+    outWeatherTex2D[id.xy] = float2(cvg, type);
 }

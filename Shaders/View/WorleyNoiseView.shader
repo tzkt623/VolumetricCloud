@@ -5,6 +5,8 @@
 		_Mix("Mix", Range(0, 1)) = 0
 		_ShapeThreshold("ShapeThreshold", Float) = 1
 		_NoiseType("NoiseType", Int) = 0
+		_LODLevel("LODLevel", Float) = 0
+		_Scale("Scale", Float) = 1
 	}
 	SubShader
 	{
@@ -17,6 +19,7 @@
 		Pass
 		{
 			CGPROGRAM
+			#pragma enable_d3d11_debug_symbols
 			#pragma vertex vert
 			#pragma fragment frag
 
@@ -41,6 +44,8 @@
 			int _Channel;
 			float _Mix;
 			float _ShapeThreshold;
+			float _LODLevel;
+			float _Scale;
 			int _NoiseType;
 
 			float4 _MainTex2D_ST;
@@ -57,7 +62,7 @@
 			{
 				float4 col = 1;
 				//mipmap有bug
-				float4 noise = tex3Dlod(_ShapeTex3D, float4(i.uv3, 0));
+				float4 noise = tex3Dlod(_ShapeTex3D, float4(i.uv3, _LODLevel));
 
 				switch (_NoiseType)
 				{
@@ -91,9 +96,9 @@
 					float shape = remap(noise.r, worley_fbm - 1, 1.0, 0.0, 1.0);
 					//shape = max(0.0, shape);
 
-					float4 detail = tex3Dlod(_DetailTex3D, float4(i.uv3, 0));
+					float4 detail = tex3Dlod(_DetailTex3D, float4(i.uv3 * _Scale, 0));
 					float detail_fbm = dot(detail.rgb, float3(0.625, 0.25, 0.125));
-					float modifier = lerp(detail_fbm, 1 - detail_fbm, saturate(i.uv3.y * 5));
+					float modifier = lerp(detail_fbm, 1 - detail_fbm, saturate(i.uv3.y* 10));
 					col.rgb = saturate(remap(shape, modifier * _Mix, 1.0, 0.0, 1.0));
 					//col.rgb = 1 - detail_fbm;
 					break;

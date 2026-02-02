@@ -14,6 +14,7 @@
 		Pass
 		{
 			CGPROGRAM
+			#pragma enable_d3d11_debug_symbols
 			#pragma vertex vert
 			#pragma fragment frag
 

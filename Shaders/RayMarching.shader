@@ -48,7 +48,7 @@
 				float3 testPoint = startPoint;
 				float sum = 0.0;
 				direction *= 0.5;//每次步进间隔
-				for (int i = 0; i < 256; i++)//步进总长度
+				for (int i = 0; i < 32; i++)//步进总长度
 				{
 					testPoint += direction;
 					if (testPoint.x < 10.0 && testPoint.x > -10.0 &&
@@ -75,7 +75,7 @@
 
 			float3 getNormal(float3 p)
 			{
-				float2 e = float2(1e-2, 0);
+				float2 e = float2(0.01, 0);
 				float3 n = getDist(p) - float3(
 					getDist(p - e.xyy),
 					getDist(p - e.yxy),
@@ -91,7 +91,7 @@
 
 				for (int i = 0; i < MAX_STEPS; i++)
 				{
-					float3 p = ro + dO * rd;
+					float3 p = ro + rd * dO;
 					dS = getDist(p);
 					dO += dS;
 
@@ -129,28 +129,44 @@
 				v2f o;
 				o.vertex = UnityObjectToClipPos(v.vertex);
 				o.uv = TRANSFORM_TEX(v.uv, _MainTex);
-				//o.ro = _WorldSpaceCameraPos;
-				o.ro = mul(unity_WorldToObject, float4(_WorldSpaceCameraPos, 1.0f));
-				o.hitPoint = v.vertex;
+				o.ro = _WorldSpaceCameraPos.xyz;
+				//o.ro = mul(unity_WorldToObject, float4(_WorldSpaceCameraPos, 1.0f));
+				//o.hitPoint = v.vertex;
+				o.hitPoint = mul(unity_ObjectToWorld, v.vertex);
 
 				float4 screenPos = ComputeScreenPos(o.vertex);
 				//float4 ndcPos = (screenPos / screenPos.w) * 2.0 - 1.0f;
 				float4 ndcPos = float4(o.uv * 2.0 - 1.0f, 0, -1);
 				float far = _ProjectionParams.z;
-				float4 clipPos = float4(ndcPos.x * far, ndcPos.y * far, far, far);
+				float4 clipPos = float4(ndcPos.x, ndcPos.y, 0, -1);
+				//float4 clipPos = float4(v.vertex.xy * 2, 0, -1);
 				float3 viewPos = mul(unity_CameraInvProjection, clipPos).xyz;
-
 				o.viewDir = mul(unity_CameraToWorld, float4(viewPos, 0.0f)).xyz;
+				//o.viewDir = mul(unity_WorldToObject, float4(o.viewDir, 0.0f)).xyz;
 
 				return o;
 			}
 
-			fixed4 frag(v2f i) : SV_Target
+			float4 frag(v2f i) : SV_Target
 			{
-				fixed4 finalColor = 1.0f;
-				finalColor.rgb = 1.0f - tex2D(_MainTex, i.uv).rgb;
+				float3 ro = i.ro;
+				float3 rd = normalize(i.viewDir);
+				//loat3 rd = normalize(i.hitPoint - ro);
 
-				return finalColor;
+				float d = rayMarch(ro, rd);
+				float3 col = 0;
+				if(d < MAX_DIST)
+				{
+					float3 p = ro + rd * d;
+					float3 norm = getNormal(p);
+					col = norm;
+				}
+				else
+				{
+					discard;
+				}
+
+				return float4(col, 1);
 			}
 			ENDCG
 		}

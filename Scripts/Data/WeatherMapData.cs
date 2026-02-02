@@ -1,5 +1,4 @@
-﻿using tezcat.Framework.Utility;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
@@ -84,81 +83,77 @@ namespace tezcat.Framework.Exp
     [System.Serializable]
     public class WeatherMapData : BaseData
     {
-        public int mWeatherResolution = 512;
-        public ComputeShader mWeatherComputeShader;
-
-        public Texture2D mWeatherTexture2D;
-        public Texture2D mHeightTypeTex2D;
-        [Range(0.0f, 1.0f)]
-        public float mCoverageRate = 1.0f;
-        [Range(0.0f, 1.0f)]
-        public float mAnvilRate = 0.0f;
         [Min(0.0001f)]
-        public float mWeatherScale = 0.0f;
+        public float mWeatherScale = 1.0f;
+        [Range(0, 1)]
+        public float mCoverage = 0.5f;
+        [Header("Motion")]
+        public Vector2 mWeatherOffset;
+        public Vector2 mWeatherSpeed;
 
-        [Space()]
-        public bool mUpdateGenerator = false;
-        [Range(0.0f, 1.0f)]
-        public float mThreshold = 0.5f;
-        public CoveragePerlinMap mCvgPerlinMap;
-        public CoverageWorleyMap mCvgWorleyMap;
-        public TypeIndexMap mTypeMap;
-        public HeightTypeMap mHeightTypeMap;
+        private RenderTexture mTexture = null;
+        public Material material { get; set; }
 
-        [Header("Viewer")]
-        public Renderer mWeatherMapViewer;
-        public Renderer mHeightTypeViewer;
-
-        RenderTexture mRealTimeWeatherTex2D;
-
-        int mKernel;
-
-        public void init()
+        public void setRenderTexture(RenderTexture texture)
         {
-            PerlinNoiseData.initSharedData();
+            mTexture = texture;
+        }
 
-            mRealTimeWeatherTex2D = new RenderTexture(mWeatherResolution, mWeatherResolution, 0, GraphicsFormat.R16G16B16A16_SFloat)
-            {
-                wrapMode = TextureWrapMode.Repeat,
-                filterMode = FilterMode.Bilinear,
-                enableRandomWrite = true,
-            };
-            mRealTimeWeatherTex2D.Create();
-
-            mKernel = mWeatherComputeShader.FindKernel("main2D");
-            mWeatherComputeShader.SetInt("inResolution", mWeatherResolution);
-            mWeatherComputeShader.SetTexture(mKernel, "outWeatherTex2D", mRealTimeWeatherTex2D);
-            mWeatherComputeShader.SetFloat("inThreshold", mThreshold);
-
-            mCvgWorleyMap.init(mWeatherResolution, mKernel, mWeatherComputeShader);
-            mCvgPerlinMap.init(2, mKernel, mWeatherComputeShader);
-            mTypeMap.init(2, mKernel, mWeatherComputeShader);
-
-            mWeatherComputeShader.Dispatch(mKernel, mWeatherResolution / 8, mWeatherResolution / 8, 1);
-
-            mWeatherMapViewer.material.SetTexture("_WeatherTex2D", mRealTimeWeatherTex2D);
-
-            mHeightTypeMap.calculate();
-            mHeightTypeViewer.material.mainTexture = mHeightTypeMap.mTex;
+        public override void initIDs()
+        {
+            this.generateIDs("_WeatherTex2D", "_WeatherData001", "_WeatherData002");
         }
 
         public override void sendToGPU(Material material)
         {
-            material.SetTexture("_WeatherTex2D", mRealTimeWeatherTex2D);
-            material.SetTexture("_HeightTypeTex2D", mHeightTypeTex2D);
-            material.SetFloat("_CoverageRate", mCoverageRate);
-            material.SetFloat("_AnvilRate", mAnvilRate);
-            material.SetFloat("_WeatherScale", mWeatherScale);
+            mWeatherOffset += mWeatherSpeed * Time.deltaTime;
 
-            if (mUpdateGenerator)
+            material.SetTexture(mIDs[0], mTexture);
+            material.SetVector(mIDs[1], new Vector4(mWeatherScale, mCoverage));
+            material.SetVector(mIDs[2], new Vector4(mWeatherOffset.x, mWeatherOffset.y, mWeatherSpeed.x, mWeatherSpeed.y));
+        }
+    }
+
+    [System.Serializable]
+    public class WeatherMap : PerlinNoise2D
+    {
+        public float mThreshold = 0.5f;
+
+        public override void generate()
+        {
+            mTexture?.Release();
+            mTexture = new RenderTexture(mResolution, mResolution, 0, GraphicsFormat.R16G16B16A16_SFloat)
             {
-                mWeatherComputeShader.SetFloat("inThreshold", mThreshold);
-                mCvgWorleyMap.sendToGPU(mKernel, mWeatherComputeShader);
-                mCvgPerlinMap.sendToGPU(mKernel, mWeatherComputeShader);
-                mTypeMap.sendToGPU(mKernel, mWeatherComputeShader);
+                name = "PerlinNoise2D",
+                dimension = TextureDimension.Tex2D,
+                wrapMode = TextureWrapMode.Repeat,
+                filterMode = FilterMode.Bilinear,
+                enableRandomWrite = true,
+                useMipMap = false,
+                autoGenerateMips = false,
+            };
+            mTexture.Create();
+            this.emitEvtTextureCreated();
 
-                mWeatherComputeShader.Dispatch(mKernel, mWeatherResolution / 8, mWeatherResolution / 8, 1);
-            }
+            mShader.SetTexture(mKernel, "outPerlinNoiseTex2D", mTexture);
+            mShader.SetBuffer(mKernel, "inPerlinHashArray", PerlineNoiseSharedData.getHashArrayBuffer());
+            mShader.SetBuffer(mKernel, "inPerlinGradients2D", PerlineNoiseSharedData.getGradients2DBuffer());
+        }
+
+        public override void sendToGPU()
+        {
+            mPerlinData1[0] = mResolution;
+            mPerlinData1[4] = mOctave;
+            mPerlinData1[8] = mFrequency;
+            mPerlinData1[12] = mLacunarity;
+            mPerlinData2.x = mOffset.x;
+            mPerlinData2.y = mOffset.y;
+            mPerlinData2.z = mThreshold;
+            mPerlinData2.w = mPersistence;
+
+            mShader.SetInts(mIDs[0], mPerlinData1);
+            mShader.SetVector(mIDs[1], mPerlinData2);
+            mShader.Dispatch(mKernel, mResolution / 8, mResolution / 8, 1);
         }
     }
 }
